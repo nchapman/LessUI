@@ -1360,6 +1360,8 @@ static void Config_init(void) {
 
 		// TODO: test this without a final line return
 		tmp2 = calloc(strlen(button_name) + 1, sizeof(char));
+		if (!tmp2)
+			return;
 		strcpy(tmp2, button_name);
 		ButtonMapping* button = &core_button_mapping[i++];
 		button->name = tmp2;
@@ -3803,6 +3805,8 @@ static int OptionEmulator_openMenu(MenuList* list, int i) {
 		}
 
 		OptionEmulator_menu.items = calloc(config.core.enabled_count + 1, sizeof(MenuItem));
+		if (!OptionEmulator_menu.items)
+			return MENU_CALLBACK_NOP;
 		for (int j = 0; j < config.core.enabled_count; j++) {
 			Option* option = config.core.enabled_options[j];
 			MenuItem* item = &OptionEmulator_menu.items[j];
