@@ -92,7 +92,7 @@ TEST_INCLUDES = -I tests/support -I tests/support/unity -I workspace/all/common
 TEST_UNITY = tests/support/unity/unity.c
 
 # List of test executables
-TEST_EXECUTABLES = tests/utils_test tests/pad_test tests/collections_test tests/sdl_mocking_example tests/gfx_text_test tests/audio_resampler_test
+TEST_EXECUTABLES = tests/utils_test tests/pad_test tests/collections_test tests/gfx_text_test tests/audio_resampler_test tests/minarch_paths_test tests/minui_utils_test tests/m3u_parser_test tests/minui_file_utils_test tests/map_parser_test tests/collection_parser_test tests/recent_parser_test
 
 # Default test target: use Docker
 test: docker-test
@@ -121,11 +121,6 @@ tests/collections_test: tests/unit/all/common/test_collections.c workspace/all/c
 	@echo "Building collections tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L
 
-# Build SDL mocking example (demonstrates fff framework usage)
-tests/sdl_mocking_example: tests/unit/all/common/test_sdl_mocking_example.c tests/support/sdl_fakes.c $(TEST_UNITY)
-	@echo "Building SDL mocking example..."
-	@$(CC) -o $@ $^ $(TEST_INCLUDES) -I tests/support/fff $(TEST_CFLAGS)
-
 # Build GFX text utility tests (uses fff for TTF mocking)
 tests/gfx_text_test: tests/unit/all/common/test_gfx_text.c workspace/all/common/gfx_text.c workspace/all/common/utils.c tests/support/sdl_fakes.c $(TEST_UNITY)
 	@echo "Building GFX text utility tests..."
@@ -135,6 +130,41 @@ tests/gfx_text_test: tests/unit/all/common/test_gfx_text.c workspace/all/common/
 tests/audio_resampler_test: tests/unit/all/common/test_audio_resampler.c workspace/all/common/audio_resampler.c $(TEST_UNITY)
 	@echo "Building audio resampler tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
+
+# Build MinArch path generation tests (pure sprintf logic)
+tests/minarch_paths_test: tests/unit/all/common/test_minarch_paths.c workspace/all/common/minarch_paths.c $(TEST_UNITY)
+	@echo "Building MinArch path generation tests..."
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
+
+# Build MinUI launcher utility tests (pure string logic)
+tests/minui_utils_test: tests/unit/all/common/test_minui_utils.c workspace/all/common/minui_utils.c workspace/all/common/utils.c $(TEST_UNITY)
+	@echo "Building MinUI launcher utility tests..."
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
+
+# Build M3U parser tests (uses file mocking with GCC --wrap, Docker-only)
+tests/m3u_parser_test: tests/unit/all/common/test_m3u_parser.c workspace/all/common/m3u_parser.c workspace/all/common/utils.c tests/support/fs_mocks.c $(TEST_UNITY)
+	@echo "Building M3U parser tests..."
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
+
+# Build MinUI file utility tests (uses file mocking with GCC --wrap, Docker-only)
+tests/minui_file_utils_test: tests/unit/all/common/test_minui_file_utils.c workspace/all/common/minui_file_utils.c workspace/all/common/utils.c tests/support/fs_mocks.c $(TEST_UNITY)
+	@echo "Building MinUI file utility tests..."
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
+
+# Build map.txt parser tests (uses file mocking with GCC --wrap, Docker-only)
+tests/map_parser_test: tests/unit/all/common/test_map_parser.c workspace/all/common/map_parser.c workspace/all/common/utils.c tests/support/fs_mocks.c $(TEST_UNITY)
+	@echo "Building map.txt parser tests..."
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
+
+# Build collection parser tests (uses file mocking with GCC --wrap, Docker-only)
+tests/collection_parser_test: tests/unit/all/common/test_collection_parser.c workspace/all/common/collection_parser.c workspace/all/common/utils.c tests/support/fs_mocks.c $(TEST_UNITY)
+	@echo "Building collection parser tests..."
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
+
+# Build recent.txt parser tests (uses file mocking with GCC --wrap, Docker-only)
+tests/recent_parser_test: tests/unit/all/common/test_recent_parser.c workspace/all/common/recent_parser.c workspace/all/common/utils.c tests/support/fs_mocks.c $(TEST_UNITY)
+	@echo "Building recent.txt parser tests..."
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
 clean-tests:
 	rm -f $(TEST_EXECUTABLES) tests/*.o tests/**/*.o

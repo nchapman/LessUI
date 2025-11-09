@@ -25,26 +25,26 @@ typedef struct SND_Frame {
  * Ring buffer abstraction for audio resampling
  */
 typedef struct AudioRingBuffer {
-	SND_Frame* frames;  // Buffer array
-	int capacity;       // Total buffer size
-	int write_pos;      // Current write position
+	SND_Frame* frames; // Buffer array
+	int capacity; // Total buffer size
+	int write_pos; // Current write position
 } AudioRingBuffer;
 
 /**
  * Resampler state for nearest-neighbor sample rate conversion
  */
 typedef struct AudioResampler {
-	int sample_rate_in;  // Input sample rate (e.g., 44100)
+	int sample_rate_in; // Input sample rate (e.g., 44100)
 	int sample_rate_out; // Output sample rate (e.g., 48000)
-	int diff;            // Accumulated error for Bresenham algorithm
+	int diff; // Accumulated error for Bresenham algorithm
 } AudioResampler;
 
 /**
  * Result of processing a frame through the resampler
  */
 typedef struct ResampleResult {
-	int wrote_frame;  // 1 if frame was written to buffer, 0 if skipped
-	int consumed;     // 1 if should advance to next input frame, 0 if reuse
+	int wrote_frame; // 1 if frame was written to buffer, 0 if skipped
+	int consumed; // 1 if should advance to next input frame, 0 if reuse
 } ResampleResult;
 
 /**
@@ -90,7 +90,7 @@ void AudioResampler_reset(AudioResampler* resampler);
  * @return ResampleResult indicating write/consume decisions
  */
 ResampleResult AudioResampler_processFrame(AudioResampler* resampler, AudioRingBuffer* buffer,
-                                            SND_Frame frame);
+                                           SND_Frame frame);
 
 /**
  * Checks if resampling is needed for given sample rates.

@@ -2,10 +2,12 @@
 
 This directory contains the test suite for MinUI, organized to mirror the source code structure.
 
+**Current Status: 318 tests, all passing** ✅
+
 ## Quick Start
 
 ```bash
-make test   # Run all tests in Docker (recommended)
+make test   # Run all 318 tests in Docker (recommended)
 ```
 
 Tests run in a Debian Buster ARM64 container that matches the platform toolchains exactly. This ensures consistency across development environments and catches platform-specific issues.
@@ -29,18 +31,34 @@ Tests run in a Debian Buster ARM64 container that matches the platform toolchain
 
 ```
 tests/
-├── unit/                       # Unit tests (mirror workspace/ structure)
+├── unit/                           # Unit tests (mirror workspace/ structure)
 │   └── all/
 │       └── common/
-│           ├── test_utils.c      # Tests for workspace/all/common/utils.c
-│           └── test_date_utils.c # Tests for workspace/all/common/date_utils.c
-├── integration/                # Integration tests (end-to-end tests)
-├── fixtures/                   # Test data, sample ROMs, configs
-├── support/                    # Test infrastructure
-│   ├── unity/                  # Unity test framework
-│   └── platform.h              # Platform stubs for testing
-├── Dockerfile                  # Test environment (Debian Buster ARM64)
-└── README.md                   # This file
+│           ├── test_utils.c              # Utils (string, file, name, date, math) - 100 tests
+│           ├── test_api_pad.c            # Input state machine - 21 tests
+│           ├── test_collections.c        # Array/Hash data structures - 30 tests
+│           ├── test_gfx_text.c           # Text truncation/wrapping - 32 tests
+│           ├── test_audio_resampler.c    # Audio resampling - 18 tests
+│           ├── test_minarch_paths.c      # Save file paths - 16 tests
+│           ├── test_minui_utils.c        # Launcher helpers - 17 tests
+│           ├── test_m3u_parser.c         # M3U parsing - 20 tests
+│           ├── test_minui_file_utils.c   # File checking - 18 tests
+│           ├── test_map_parser.c         # map.txt aliasing - 22 tests
+│           ├── test_collection_parser.c  # Collection lists - 11 tests
+│           └── test_recent_parser.c      # Recent games - 13 tests
+├── integration/                    # Integration tests (end-to-end tests)
+├── fixtures/                       # Test data, sample ROMs, configs
+├── support/                        # Test infrastructure
+│   ├── unity/                      # Unity test framework
+│   ├── fff/                        # Fake Function Framework (SDL mocking)
+│   │   └── fff.h                   # Header-only mocking library
+│   ├── platform.h                  # Platform stubs for testing
+│   ├── sdl_stubs.h                 # Minimal SDL type definitions
+│   ├── sdl_fakes.h/c               # SDL function mocks (fff-based)
+│   ├── platform_mocks.h/c          # Platform function mocks
+│   └── fs_mocks.h/c                # File system mocks (--wrap-based)
+├── Dockerfile                      # Test environment (Debian Buster ARM64)
+└── README.md                       # This file
 ```
 
 ## Organization Philosophy
@@ -340,7 +358,7 @@ void test_battery_status(void) {
 
 ### Complete Example
 
-See `tests/unit/all/common/test_sdl_mocking_example.c` for a comprehensive demonstration of fff usage.
+See `tests/unit/all/common/test_gfx_text.c` for a comprehensive demonstration of fff usage with custom fake implementations.
 
 ### When to Extract vs. Mock
 
@@ -364,7 +382,138 @@ See `tests/unit/all/common/test_sdl_mocking_example.c` for a comprehensive demon
 For more fff features, see:
 - [fff GitHub](https://github.com/meekrosoft/fff)
 - `tests/support/fff/fff.h` (inline documentation)
-- `tests/unit/all/common/test_sdl_mocking_example.c` (examples)
+- `tests/unit/all/common/test_gfx_text.c` (real-world usage examples)
+
+## File System Function Mocking
+
+Testing file I/O code requires mocking file system operations. We use **GCC's --wrap linker flag** for this.
+
+### Infrastructure Overview
+
+```
+tests/support/
+├── fs_mocks.h             # File mocking API
+└── fs_mocks.c             # File mocking implementation
+```
+
+### What is --wrap?
+
+GCC's linker supports `--wrap=symbol` which intercepts function calls:
+
+```bash
+gcc ... -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fgets
+```
+
+**How it works:**
+- Calls to `fopen()` are redirected to `__wrap_fopen()` (your mock)
+- Your mock can call `__real_fopen()` for the real implementation
+- No code changes needed - pure link-time substitution
+
+**Platform support:**
+- ✅ Linux (GCC/GNU ld)
+- ✅ Docker (Debian Buster with GCC) - **This is how we test**
+- ❌ macOS (uses ld64, doesn't support --wrap)
+
+### Using File Mocking
+
+#### Example: Testing M3U Parser
+
+```c
+#include "../../../support/unity/unity.h"
+#include "../../../support/fs_mocks.h"
+#include "../../../../workspace/all/common/m3u_parser.h"
+
+void setUp(void) {
+    // Reset mock file system before each test
+    mock_fs_reset();
+}
+
+void test_parse_m3u_file(void) {
+    // Create mock files
+    mock_fs_add_file("/Roms/PS1/FF7.m3u",
+        "FF7 (Disc 1).bin\nFF7 (Disc 2).bin\n");
+    mock_fs_add_file("/Roms/PS1/FF7 (Disc 1).bin", "disc data");
+
+    // Call production code - it uses real fopen/fgets
+    char disc_path[256];
+    int found = M3U_getFirstDisc("/Roms/PS1/FF7.m3u", disc_path);
+
+    // But it's actually reading from our mock!
+    TEST_ASSERT_TRUE(found);
+    TEST_ASSERT_EQUAL_STRING("/Roms/PS1/FF7 (Disc 1).bin", disc_path);
+}
+```
+
+#### Available Mock Functions
+
+**Currently wrapped:**
+- `exists(char* path)` - MinUI's file existence check
+- `fopen(const char* path, const char* mode)` - Open files (read mode only)
+- `fclose(FILE* stream)` - Close files
+- `fgets(char* s, int size, FILE* stream)` - Read lines
+
+**Mock API:**
+```c
+void mock_fs_reset(void);                           // Clear all mock files
+void mock_fs_add_file(const char* path, const char* content);  // Add mock file
+int mock_fs_exists(const char* path);               // Check if mock file exists
+```
+
+### Complete Examples
+
+**Real-world usage:**
+- `tests/unit/all/common/test_m3u_parser.c` - M3U playlist parsing
+- `tests/unit/all/common/test_minui_file_utils.c` - File existence checking
+
+### Compilation Requirements
+
+Tests using file mocking must be compiled with --wrap flags:
+
+```makefile
+tests/my_test: test_my_test.c my_code.c utils.c fs_mocks.c $(TEST_UNITY)
+	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) \
+		-Wl,--wrap=exists \
+		-Wl,--wrap=fopen \
+		-Wl,--wrap=fclose \
+		-Wl,--wrap=fgets
+```
+
+### When to Use File Mocking
+
+**Use file mocking when:**
+- Testing file parsing logic (map.txt, .m3u, .cue files)
+- Testing path construction with existence checks
+- Testing functions that read configuration files
+- Verifying error handling (file not found, empty files)
+
+**Don't use file mocking when:**
+- Function only manipulates paths (use pure string functions instead)
+- Testing actual file I/O performance
+- Integration testing (use real temp files)
+
+### Limitations
+
+**Current implementation:**
+- Read mode only (write mode not implemented)
+- No directory listing (opendir/readdir not mocked yet)
+- Files stored as strings in memory (max 8KB per file)
+- **Docker-only** - won't compile natively on macOS
+
+### Adding More Wrapped Functions
+
+To wrap additional functions:
+
+1. Add wrapper in `tests/support/fs_mocks.c`:
+```c
+FILE* __wrap_fwrite(const void* ptr, size_t size, size_t nmemb, FILE* stream) {
+    // Your mock implementation
+}
+```
+
+2. Add to compile flags in `Makefile.qa`:
+```makefile
+-Wl,--wrap=fwrite
+```
 
 ## Test Guidelines
 
@@ -408,6 +557,41 @@ void test_getEmuName_with_parens(void) {
     TEST_ASSERT_EQUAL_STRING("GB", out);
 }
 ```
+
+## Test Summary
+
+**Total: 318 tests across 12 test suites**
+
+### Extracted Modules (Testable Logic)
+
+These modules were extracted from large files (api.c, minui.c, minarch.c) to enable comprehensive unit testing:
+
+| Module | Lines | Tests | Extracted From | Key Functions |
+|--------|-------|-------|----------------|---------------|
+| utils.c | 703 | 100 | (original) | String, file, name, date, math utilities |
+| pad.c | 183 | 21 | api.c | Button state machine, analog input |
+| collections.c | 193 | 30 | minui.c | Array, Hash data structures |
+| gfx_text.c | 170 | 32 | api.c | Text truncation, wrapping, sizing |
+| audio_resampler.c | 90 | 18 | api.c | Bresenham sample rate conversion |
+| minarch_paths.c | 77 | 16 | minarch.c | Save file path generation |
+| minui_utils.c | 48 | 17 | minui.c | Index char, console dir detection |
+| m3u_parser.c | 132 | 20 | minui.c | M3U playlist parsing (getFirstDisc + getAllDiscs) |
+| minui_file_utils.c | 95 | 18 | minui.c | hasEmu, hasCue, hasM3u |
+| map_parser.c | 64 | 22 | minui.c/minarch.c | ROM display name aliasing (map.txt) |
+| collection_parser.c | 70 | 11 | minui.c | Custom ROM list parsing (.txt files) |
+| recent_parser.c | 77 | 13 | minui.c | Recently played games (recent.txt) |
+| **Total** | **1,902** | **318** | | |
+
+### Testing Technologies
+
+**Mocking Frameworks:**
+- **fff (Fake Function Framework)** - SDL function mocking (header-only)
+- **GCC --wrap** - File system function mocking (link-time substitution)
+
+**What We Can Mock:**
+- SDL functions (SDL_PollEvent, TTF_SizeUTF8, etc.)
+- Platform functions (PLAT_getBatteryStatus, PLAT_pollInput, etc.)
+- File I/O functions (exists, fopen, fgets, fclose)
 
 ## Current Test Coverage
 
@@ -500,28 +684,131 @@ void test_getEmuName_with_parens(void) {
 
 **Note:** Extracted from `minui.c` for reusability across all components.
 
-### SDL Mocking Infrastructure - ✅ 7 tests
-**File:** `tests/unit/all/common/test_sdl_mocking_example.c`
+### workspace/all/common/gfx_text.c - ✅ 32 tests
+**File:** `tests/unit/all/common/test_gfx_text.c`
 
-- SDL event mocking (SDL_PollEvent)
-- TTF function mocking (TTF_SizeUTF8 with custom implementations)
-- fff framework features (call tracking, return sequences, history)
+- GFX_truncateText() - Text truncation with ellipsis (8 tests)
+- GFX_wrapText() - Multi-line text wrapping (16 tests)
+- GFX_sizeText() - Multi-line text bounding box calculation (8 tests)
 
-**Coverage:** Demonstrates SDL mocking with Fake Function Framework (fff).
+**Coverage:** Complete coverage of text manipulation algorithms.
 
-**Infrastructure:**
-- `tests/support/fff/fff.h` - Fake Function Framework (header-only)
-- `tests/support/sdl_stubs.h` - Minimal SDL type definitions
-- `tests/support/sdl_fakes.h/c` - SDL function fakes
-- `tests/support/platform_mocks.h/c` - Platform function mocks
+**Note:** Extracted from `api.c`, uses fff to mock TTF_SizeUTF8.
 
-**Note:** Provides foundation for future testing of SDL-dependent code.
+### workspace/all/common/audio_resampler.c - ✅ 18 tests
+**File:** `tests/unit/all/common/test_audio_resampler.c`
+
+- Nearest-neighbor sample rate conversion
+- Bresenham-like algorithm for frame duplication/skipping
+- Upsampling (44100 -> 48000 Hz)
+- Downsampling (48000 -> 44100 Hz)
+- Realistic scenarios (1 second of audio)
+- Ring buffer integration
+
+**Coverage:** Complete coverage of audio resampling algorithm.
+
+**Note:** Extracted from `api.c`'s SND_resampleNear(), pure algorithm with no SDL dependencies.
+
+### workspace/all/common/minarch_paths.c - ✅ 16 tests
+**File:** `tests/unit/all/common/test_minarch_paths.c`
+
+- SRAM save file path generation (.sav files)
+- RTC file path generation (.rtc files)
+- Save state path generation (.st0-.st9 files)
+- Config file path generation (.cfg files with device tags)
+
+**Coverage:** Complete coverage of MinArch save file path logic.
+
+**Note:** Extracted from `minarch.c`, pure sprintf logic.
+
+### workspace/all/common/minui_utils.c - ✅ 17 tests
+**File:** `tests/unit/all/common/test_minui_utils.c`
+
+- MinUI_getIndexChar() - Alphabetical indexing for ROM navigation (7 tests)
+- MinUI_isConsoleDir() - Console directory classification (8 tests)
+- Integration tests (2 tests)
+
+**Coverage:** Complete coverage of MinUI helper utilities.
+
+**Note:** Extracted from `minui.c`, pure string logic.
+
+### workspace/all/common/m3u_parser.c - ✅ 20 tests
+**File:** `tests/unit/all/common/test_m3u_parser.c`
+
+- M3U_getFirstDisc() - First disc extraction (8 tests)
+- M3U_getAllDiscs() - Full disc list parsing (12 tests)
+- Empty line handling
+- Windows newline support
+- Path construction (relative to M3U location)
+- Error handling (missing files, empty playlists)
+- Disc naming and numbering
+
+**Coverage:** Complete coverage of M3U parsing logic (getFirstDisc + getAllDiscs).
+
+**Note:** Extracted from `minui.c`, uses file system mocking.
+
+### workspace/all/common/minui_file_utils.c - ✅ 18 tests
+**File:** `tests/unit/all/common/test_minui_file_utils.c`
+
+- MinUI_hasEmu() - Emulator availability checking (5 tests)
+- MinUI_hasCue() - CUE file detection for disc games (4 tests)
+- MinUI_hasM3u() - M3U playlist detection (5 tests)
+- Integration tests (multi-disc workflow) (4 tests)
+
+**Coverage:** Complete coverage of file existence checking utilities.
+
+**Note:** Extracted from `minui.c`, uses file system mocking.
+
+### workspace/all/common/map_parser.c - ✅ 22 tests
+**File:** `tests/unit/all/common/test_map_parser.c`
+
+- Map_getAlias() - ROM display name aliasing
+- Tab-delimited format parsing (filename<TAB>display name)
+- Hidden ROM detection (alias starts with '.')
+- Basic parsing (with and without aliases)
+- Integration tests (real-world map.txt files)
+- Error handling (file not found, empty files, missing ROMs)
+
+**Coverage:** Complete coverage of map.txt parsing logic.
+
+**Note:** Extracted from `minui.c`'s Directory_index() and `minarch.c`'s getAlias(), uses file system mocking.
+
+### workspace/all/common/collection_parser.c - ✅ 11 tests
+**File:** `tests/unit/all/common/test_collection_parser.c`
+
+- Collection_parse() - Custom ROM list parsing
+- Plain text format (one ROM path per line)
+- ROM validation (only includes existing files)
+- PAK detection (identifies .pak files)
+- Empty line handling
+- Integration tests (multi-platform collections)
+- Error handling (file not found, all ROMs missing)
+
+**Coverage:** Complete coverage of collection .txt parsing logic.
+
+**Note:** Extracted from `minui.c`'s getCollection(), uses file system mocking.
+
+### workspace/all/common/recent_parser.c - ✅ 13 tests
+**File:** `tests/unit/all/common/test_recent_parser.c`
+
+- Recent_parse() - Recently played games parsing
+- Tab-delimited format (path<TAB>alias, alias optional)
+- ROM validation (only includes existing files)
+- Order preservation (newest first)
+- Format handling (Windows newlines, special characters)
+- Integration tests (realistic recent.txt)
+- Error handling (file not found, empty files, all ROMs missing)
+
+**Coverage:** Complete coverage of recent.txt parsing logic.
+
+**Note:** Extracted from `minui.c`'s loadRecents(), uses file system mocking.
 
 ### Todo
-- [ ] workspace/all/common/api.c GFX functions (requires extraction or complex mocking)
-- [ ] workspace/all/minui/minui.c (integration tests)
-- [ ] workspace/all/minarch/minarch.c (integration tests)
-- [ ] Integration tests for full launch workflow
+- [ ] Additional api.c GFX rendering functions (mostly SDL pixel operations)
+- [ ] Integration tests for minui.c/minarch.c workflows
+- [ ] Write-mode file mocking (fputs, fprintf) for saveRecents()
+- [ ] Directory mocking (opendir, readdir) for hasRecents(), hasCollections()
+- [ ] Binary file I/O mocking (fread, fwrite) for SRAM/state files
 
 ## Continuous Integration
 

@@ -53,7 +53,7 @@ void AudioResampler_reset(AudioResampler* resampler) {
  * @return ResampleResult with wrote_frame and consumed flags
  */
 ResampleResult AudioResampler_processFrame(AudioResampler* resampler, AudioRingBuffer* buffer,
-                                            SND_Frame frame) {
+                                           SND_Frame frame) {
 	ResampleResult result = {0, 0};
 
 	// Decide if we should write this frame to output
