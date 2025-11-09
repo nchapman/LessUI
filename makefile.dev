@@ -70,7 +70,7 @@ MINUI_SOURCE = workspace/all/minui/minui.c \
 BUILD_DIR = workspace/all/minui/build/macos
 MINUI_BIN = $(BUILD_DIR)/minui
 
-# Check if SDL2 is installed
+# Check if SDL2 is installed and sync resources
 check-sdl:
 	@if [ ! -d /opt/homebrew/include/SDL2 ] && [ ! -d /usr/local/include/SDL2 ]; then \
 		echo "Error: SDL2 not found. Please install:"; \
@@ -85,6 +85,8 @@ check-sdl:
 		mkdir -p "$(FAKESD_PATH)/.system"; \
 		echo "FAKESD structure created. Add ROMs to $(FAKESD_PATH)/Roms/"; \
 	fi
+	@mkdir -p "$(FAKESD_PATH)/.system/res"
+	@rsync -a --delete skeleton/SYSTEM/res/ "$(FAKESD_PATH)/.system/res/"
 
 # Build minui for macOS
 dev: check-sdl
