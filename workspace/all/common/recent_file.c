@@ -1,12 +1,12 @@
 /**
- * recent_parser.c - Recently played games file parser
+ * recent_file.c - Recently played games file I/O
  *
  * Extracted from minui.c for testability.
  */
 
 #define _POSIX_C_SOURCE 200809L // Required for strdup()
 
-#include "recent_parser.h"
+#include "recent_file.h"
 #include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>

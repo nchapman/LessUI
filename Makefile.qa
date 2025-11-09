@@ -161,18 +161,18 @@ tests/collection_parser_test: tests/unit/all/common/test_collection_parser.c wor
 	@echo "Building collection parser tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
-# Build recent.txt parser tests (uses file mocking with GCC --wrap, Docker-only)
-tests/recent_parser_test: tests/unit/all/common/test_recent_parser.c workspace/all/common/recent_parser.c workspace/all/common/utils.c tests/support/fs_mocks.c $(TEST_UNITY)
+# Build recent.txt file tests (uses file mocking with GCC --wrap, Docker-only)
+tests/recent_parser_test: tests/unit/all/common/test_recent_parser.c workspace/all/common/recent_file.c workspace/all/common/utils.c tests/support/fs_mocks.c $(TEST_UNITY)
 	@echo "Building recent.txt parser tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
 # Build recent.txt writer tests (uses real temp files, no --wrap needed)
-tests/recent_writer_test: tests/unit/all/common/test_recent_writer.c workspace/all/common/recent_parser.c workspace/all/common/utils.c $(TEST_UNITY)
+tests/recent_writer_test: tests/unit/all/common/test_recent_writer.c workspace/all/common/recent_file.c workspace/all/common/utils.c $(TEST_UNITY)
 	@echo "Building recent.txt writer tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L
 
 # Build directory utility tests (uses real temp directories, no --wrap needed)
-tests/directory_utils_test: tests/unit/all/common/test_directory_utils.c workspace/all/common/directory_utils.c workspace/all/common/utils.c $(TEST_UNITY)
+tests/directory_utils_test: tests/unit/all/common/test_directory_utils.c workspace/all/common/minui_file_utils.c workspace/all/common/utils.c $(TEST_UNITY)
 	@echo "Building directory utility tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_DEFAULT_SOURCE
 

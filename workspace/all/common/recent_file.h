@@ -1,16 +1,17 @@
 /**
- * recent_parser.h - Recently played games file parser
+ * recent_file.h - Recently played games file I/O
  *
- * Parses recent.txt which stores recently played ROMs.
+ * Manages recent.txt which stores recently played ROMs.
  * Format: Tab-delimited path and optional alias
  *   /Roms/GB/mario.gb<TAB>Super Mario
  *   /Roms/NES/zelda.nes
  *
+ * Provides both read (Recent_parse) and write (Recent_save) operations.
  * Extracted from minui.c for testability.
  */
 
-#ifndef __RECENT_PARSER_H__
-#define __RECENT_PARSER_H__
+#ifndef __RECENT_FILE_H__
+#define __RECENT_FILE_H__
 
 /**
  * Recent game entry
@@ -62,4 +63,4 @@ int Recent_save(char* recent_path, Recent_Entry** entries, int count);
  */
 void Recent_freeEntries(Recent_Entry** entries, int count);
 
-#endif // __RECENT_PARSER_H__
+#endif // __RECENT_FILE_H__

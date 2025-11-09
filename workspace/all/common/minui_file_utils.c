@@ -1,11 +1,12 @@
 /**
- * minui_file_utils.c - File existence checking utilities for MinUI
+ * minui_file_utils.c - File and directory checking utilities for MinUI
  *
  * Extracted from minui.c for testability.
  */
 
 #include "minui_file_utils.h"
 #include "utils.h"
+#include <dirent.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -102,4 +103,33 @@ int MinUI_hasM3u(char* rom_path, char* m3u_path) {
 	strcpy(tmp, ".m3u");
 
 	return exists(m3u_path);
+}
+
+/**
+ * Checks if a directory contains any non-hidden files.
+ *
+ * @param dir_path Full path to directory
+ * @return 1 if directory exists and contains non-hidden files, 0 otherwise
+ */
+int MinUI_hasNonHiddenFiles(const char* dir_path) {
+	if (!exists((char*)dir_path)) {
+		return 0;
+	}
+
+	DIR* dh = opendir(dir_path);
+	if (!dh) {
+		return 0;
+	}
+
+	struct dirent* dp;
+	while ((dp = readdir(dh)) != NULL) {
+		if (hide(dp->d_name)) {
+			continue;
+		}
+		closedir(dh);
+		return 1;
+	}
+
+	closedir(dh);
+	return 0;
 }

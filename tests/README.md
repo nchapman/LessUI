@@ -45,9 +45,9 @@ tests/
 │           ├── test_minui_file_utils.c   # File checking - 18 tests
 │           ├── test_map_parser.c         # map.txt aliasing - 22 tests
 │           ├── test_collection_parser.c  # Collection lists - 11 tests
-│           ├── test_recent_parser.c      # Recent games parsing - 13 tests
+│           ├── test_recent_file.c      # Recent games parsing - 13 tests
 │           ├── test_recent_writer.c      # Recent games writing - 5 tests
-│           ├── test_directory_utils.c    # Directory operations - 7 tests
+│           ├── test_minui_file_utils (directory).c    # Directory operations - 7 tests
 │           └── test_binary_file_utils.c  # Binary file I/O - 12 tests
 ├── integration/                    # Integration tests (end-to-end tests)
 ├── fixtures/                       # Test data, sample ROMs, configs
@@ -601,8 +601,8 @@ These modules were extracted from large files (api.c, minui.c, minarch.c) to ena
 | minui_file_utils.c | 95 | 18 | minui.c | hasEmu, hasCue, hasM3u |
 | map_parser.c | 64 | 22 | minui.c/minarch.c | ROM display name aliasing (map.txt) |
 | collection_parser.c | 70 | 11 | minui.c | Custom ROM list parsing (.txt files) |
-| recent_parser.c | 95 | 18 | minui.c | Recent games read/write (parse + save) |
-| directory_utils.c | 35 | 7 | minui.c | Directory content checking |
+| recent_file.c | 95 | 18 | minui.c | Recent games read/write (parse + save) |
+| minui_file_utils (directory).c | 35 | 7 | minui.c | Directory content checking |
 | binary_file_utils.c | 42 | 12 | minarch.c | Binary file read/write (fread/fwrite) |
 | **Total** | **1,997** | **342** | | |
 
@@ -820,9 +820,9 @@ These modules were extracted from large files (api.c, minui.c, minarch.c) to ena
 
 **Note:** Extracted from `minui.c`'s getCollection(), uses file system mocking.
 
-### workspace/all/common/recent_parser.c - ✅ 18 tests (13 read + 5 write)
+### workspace/all/common/recent_file.c - ✅ 18 tests (13 read + 5 write)
 **Files:**
-- `tests/unit/all/common/test_recent_parser.c` (13 tests) - Recent_parse()
+- `tests/unit/all/common/test_recent_file.c` (13 tests) - Recent_parse()
 - `tests/unit/all/common/test_recent_writer.c` (5 tests) - Recent_save()
 
 **Read operations (uses file mocking):**
@@ -842,8 +842,8 @@ These modules were extracted from large files (api.c, minui.c, minarch.c) to ena
 
 **Note:** Extracted from `minui.c` loadRecents()/saveRecents(). Uses hybrid approach: file mocking for reads, real temp files for writes.
 
-### workspace/all/common/directory_utils.c - ✅ 7 tests
-**File:** `tests/unit/all/common/test_directory_utils.c`
+### workspace/all/common/minui_file_utils (directory).c - ✅ 7 tests
+**File:** `tests/unit/all/common/test_minui_file_utils (directory).c`
 
 - Directory_hasNonHiddenFiles() - Directory content checking
 - Empty directory detection
