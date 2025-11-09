@@ -16,6 +16,10 @@
 #include "defines.h"
 #include <stdint.h>
 
+// Type definitions
+// When included from api.c, api.h is included first and defines these
+// When included standalone (tests, pad.c itself), we need to define them
+#ifndef __API_H__
 /**
  * Analog stick axis values.
  */
@@ -41,6 +45,7 @@ typedef struct PAD_Context {
  * Global input state, polled each frame.
  */
 extern PAD_Context pad;
+#endif
 
 /**
  * Analog stick deadzone (threshold for registering input).

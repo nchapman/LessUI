@@ -5,13 +5,25 @@
  * Extracted from api.c for better testability and reusability.
  */
 
+// Include appropriate headers based on build mode
+#ifdef UNIT_TEST_BUILD
+// Test mode: include SDL stubs to get TTF_Font typedef
+// (sdl_stubs.h available via -I tests/support in test builds)
+#include "sdl_stubs.h"
+#else
+// Production mode: include api.h to get SDL types
+#include "api.h"
+#endif
+
 #include "gfx_text.h"
 #include "utils.h"
 #include <string.h>
 
 // TTF_SizeUTF8 is provided by SDL_ttf in production
-// In tests, it's mocked with fff
+// In tests, it's mocked with fff (declared in sdl_fakes.h)
+#ifndef UNIT_TEST_BUILD
 extern int TTF_SizeUTF8(TTF_Font* font, const char* text, int* w, int* h);
+#endif
 
 // Constants - typically defined in platform headers
 #ifndef MAX_PATH

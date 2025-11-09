@@ -42,12 +42,12 @@ tests/
 │           ├── test_minarch_paths.c      # Save file paths - 16 tests
 │           ├── test_minui_utils.c        # Launcher helpers - 17 tests
 │           ├── test_m3u_parser.c         # M3U parsing - 20 tests
-│           ├── test_minui_file_utils.c   # File checking - 18 tests
+│           ├── test_minui_file_utils.c   # File/dir checking - 25 tests
 │           ├── test_map_parser.c         # map.txt aliasing - 22 tests
 │           ├── test_collection_parser.c  # Collection lists - 11 tests
-│           ├── test_recent_file.c      # Recent games parsing - 13 tests
+│           ├── test_recent_file.c        # Recent games parsing - 13 tests
 │           ├── test_recent_writer.c      # Recent games writing - 5 tests
-│           ├── test_minui_file_utils (directory).c    # Directory operations - 7 tests
+│           ├── test_directory_utils.c    # Directory ops (→ minui_file_utils) - 7 tests
 │           └── test_binary_file_utils.c  # Binary file I/O - 12 tests
 ├── integration/                    # Integration tests (end-to-end tests)
 ├── fixtures/                       # Test data, sample ROMs, configs
@@ -598,11 +598,10 @@ These modules were extracted from large files (api.c, minui.c, minarch.c) to ena
 | minarch_paths.c | 77 | 16 | minarch.c | Save file path generation |
 | minui_utils.c | 48 | 17 | minui.c | Index char, console dir detection |
 | m3u_parser.c | 132 | 20 | minui.c | M3U playlist parsing (getFirstDisc + getAllDiscs) |
-| minui_file_utils.c | 95 | 18 | minui.c | hasEmu, hasCue, hasM3u |
+| minui_file_utils.c | 130 | 25 | minui.c | File/dir checking (hasEmu, hasCue, hasM3u, hasNonHiddenFiles) |
 | map_parser.c | 64 | 22 | minui.c/minarch.c | ROM display name aliasing (map.txt) |
 | collection_parser.c | 70 | 11 | minui.c | Custom ROM list parsing (.txt files) |
 | recent_file.c | 95 | 18 | minui.c | Recent games read/write (parse + save) |
-| minui_file_utils (directory).c | 35 | 7 | minui.c | Directory content checking |
 | binary_file_utils.c | 42 | 12 | minarch.c | Binary file read/write (fread/fwrite) |
 | **Total** | **1,997** | **342** | | |
 
@@ -779,17 +778,28 @@ These modules were extracted from large files (api.c, minui.c, minarch.c) to ena
 
 **Note:** Extracted from `minui.c`, uses file system mocking.
 
-### workspace/all/common/minui_file_utils.c - ✅ 18 tests
-**File:** `tests/unit/all/common/test_minui_file_utils.c`
+### workspace/all/common/minui_file_utils.c - ✅ 25 tests
+**Files:**
+- `tests/unit/all/common/test_minui_file_utils.c` (18 tests)
+- `tests/unit/all/common/test_directory_utils.c` (7 tests)
 
+**File existence checking (18 tests):**
 - MinUI_hasEmu() - Emulator availability checking (5 tests)
 - MinUI_hasCue() - CUE file detection for disc games (4 tests)
 - MinUI_hasM3u() - M3U playlist detection (5 tests)
 - Integration tests (multi-disc workflow) (4 tests)
 
-**Coverage:** Complete coverage of file existence checking utilities.
+**Directory content checking (7 tests):**
+- MinUI_hasNonHiddenFiles() - Directory content checking
+- Empty directory detection
+- Hidden file filtering (.dotfiles, .DS_Store, etc.)
+- Mixed content (hidden + visible files)
+- Subdirectory handling
+- Nonexistent directory error handling
 
-**Note:** Extracted from `minui.c`, uses file system mocking.
+**Coverage:** Complete coverage of file and directory checking utilities.
+
+**Note:** Extracted from `minui.c` hasEmu/hasCue/hasM3u/hasCollections/hasRoms. File tests use mocking, directory tests use real temp directories with mkdtemp().
 
 ### workspace/all/common/map_parser.c - ✅ 22 tests
 **File:** `tests/unit/all/common/test_map_parser.c`
@@ -841,20 +851,6 @@ These modules were extracted from large files (api.c, minui.c, minarch.c) to ena
 **Coverage:** Complete coverage of recent.txt read/write operations.
 
 **Note:** Extracted from `minui.c` loadRecents()/saveRecents(). Uses hybrid approach: file mocking for reads, real temp files for writes.
-
-### workspace/all/common/minui_file_utils (directory).c - ✅ 7 tests
-**File:** `tests/unit/all/common/test_minui_file_utils (directory).c`
-
-- Directory_hasNonHiddenFiles() - Directory content checking
-- Empty directory detection
-- Hidden file filtering (.dotfiles)
-- Mixed content (hidden + visible files)
-- Subdirectory handling
-- Nonexistent directory error handling
-
-**Coverage:** Complete coverage of directory content checking logic.
-
-**Note:** Extracted from `minui.c` hasCollections()/hasRoms(). Uses real temp directories with mkdtemp().
 
 ### workspace/all/common/binary_file_utils.c - ✅ 12 tests
 **File:** `tests/unit/all/common/test_binary_file_utils.c`
