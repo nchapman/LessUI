@@ -1,10 +1,10 @@
-# MinUI Development Guide
+# LessUI Development Guide
 
-This guide covers building MinUI, running tests, and contributing code.
+This guide covers building LessUI, running tests, and contributing code.
 
-## Building MinUI
+## Building LessUI
 
-MinUI uses Docker to cross-compile for ARM devices. You don't need the actual hardware to build.
+LessUI uses Docker to cross-compile for ARM devices. You don't need the actual hardware to build.
 
 ### Prerequisites
 
@@ -60,7 +60,7 @@ This runs `cppcheck` on `workspace/all/` which contains all the platform-indepen
 
 ### Unit Tests
 
-MinUI uses Unity for testing:
+LessUI uses Unity for testing:
 ```bash
 make test
 ```
@@ -94,7 +94,7 @@ Run tests: `make test`
 
 ### Code Formatting
 
-MinUI uses `clang-format` with tabs and K&R-style braces:
+LessUI uses `clang-format` with tabs and K&R-style braces:
 ```bash
 make format            # Format all code
 make format-check      # Check without changing
@@ -116,7 +116,7 @@ make lint-shell
 ## Project Structure
 
 ```
-MinUI/
+LessUI/
 ├── workspace/
 │   ├── all/              # Platform-independent code
 │   │   ├── minui/        # Launcher
@@ -140,7 +140,7 @@ MinUI/
 
 ## Platform Architecture
 
-MinUI uses a **platform abstraction layer** so one codebase supports 20+ devices:
+LessUI uses a **platform abstraction layer** so one codebase supports 20+ devices:
 
 **Common code** (`workspace/all/`) calls abstract APIs like:
 - `GFX_clear()` - Clear screen
@@ -235,7 +235,7 @@ Note: Some platforms share cores (e.g., my282 copies cores from rg35xx due to sa
 
 ### Updating Assets
 
-MinUI uses a **source + generated** asset system for easy maintenance.
+LessUI uses a **source + generated** asset system for easy maintenance.
 
 **Source assets** live in `skeleton/SYSTEM/res-src/`:
 - `assets.png` - UI sprite sheet (512×512)
@@ -293,7 +293,7 @@ Then check logs on device.
 
 ## Resources
 
-- [Architecture Guide](ARCHITECTURE.md) - How MinUI works internally
+- [Architecture Guide](ARCHITECTURE.md) - How LessUI works internally
 - [Cores Guide](CORES.md) - How libretro cores work
 - [Pak Development](PAKS.md) - Creating custom emulator paks
 - [Platform READMEs](../workspace/) - Platform-specific docs

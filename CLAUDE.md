@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MinUI is a focused, custom launcher and libretro frontend for retro handheld gaming devices. It provides a simple, distraction-free interface for playing retro games across multiple hardware platforms (Miyoo Mini, Trimui Smart, Anbernic RG35xx series, etc.).
+LessUI is a focused, custom launcher and libretro frontend for retro handheld gaming devices. It provides a simple, distraction-free interface for playing retro games across multiple hardware platforms (Miyoo Mini, Trimui Smart, Anbernic RG35xx series, etc.).
 
 **Key Design Philosophy:**
 - Simplicity: No configuration, no boxart, no themes
@@ -15,7 +15,7 @@ MinUI is a focused, custom launcher and libretro frontend for retro handheld gam
 
 ### Multi-Platform Build System
 
-MinUI uses a **platform abstraction layer** to support 15+ different handheld devices with a single codebase:
+LessUI uses a **platform abstraction layer** to support 15+ different handheld devices with a single codebase:
 
 ```
 workspace/
@@ -81,7 +81,7 @@ The common code in `workspace/all/common/defines.h` uses these to create derived
 
 ### Docker-Based Cross-Compilation
 
-MinUI uses Docker containers with platform-specific toolchains to cross-compile for ARM devices:
+LessUI uses Docker containers with platform-specific toolchains to cross-compile for ARM devices:
 
 ```bash
 # Enter platform build environment
@@ -179,7 +179,7 @@ This pattern appears in `getEmuName()` and was the source of a critical bug.
 
 ### Display Name Processing
 
-MinUI automatically cleans up ROM filenames for display:
+LessUI automatically cleans up ROM filenames for display:
 - Removes file extensions (`.gb`, `.nes`, `.p8.png`)
 - Strips region codes and version info in parentheses: `Game (USA) (v1.2)` → `Game`
 - Trims whitespace
