@@ -4,7 +4,6 @@ $(PLATFORM):
 	# installer
 	cp ./workspace/$@/install/boot.sh ./build/BOOT/common/$@.sh
 	mkdir -p ./build/BOOT/common/$@/
-	cp ./workspace/$@/install/*.png ./build/BOOT/common/$@/
 	cp ./workspace/$@/show/show.elf ./build/BOOT/common/$@/
 	cp ./workspace/$@/other/unzip60/unzip ./build/BOOT/common/$@/
 	cp ./build/SYSTEM/$@/bin/leds_off ./build/BOOT/common/$@/

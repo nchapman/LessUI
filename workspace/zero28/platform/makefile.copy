@@ -7,7 +7,6 @@ $(PLATFORM):
 	cp ./workspace/$@/install/boot.sh ./build/BOOT/common/$@.sh
 	cp ./workspace/$@/install/update.sh ./build/SYSTEM/$@/bin/install.sh
 	mkdir -p ./build/BOOT/common/$@/
-	cp ./workspace/$@/install/*.png ./build/BOOT/common/$@/
 	cp ./workspace/$@/show/show.elf ./build/BOOT/common/$@/
 	# extras
 	cp ./workspace/$@/other/DinguxCommander-sdl2/DinguxCommander ./build/EXTRAS/Tools/$@/Files.pak/

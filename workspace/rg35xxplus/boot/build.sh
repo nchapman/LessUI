@@ -7,6 +7,21 @@ TARGET=dmenu.bin
 # SOURCE=test.sh
 # TARGET=launch.sh
 
+# Copy boot assets from central location
+ASSETS=../../skeleton/SYSTEM/res
+cp $ASSETS/installing@2x.bmp installing.bmp
+cp $ASSETS/updating@2x.bmp updating.bmp
+cp $ASSETS/bootlogo@2x.bmp bootlogo.bmp
+cp $ASSETS/installing@2x-rotated.bmp installing-r.bmp
+cp $ASSETS/updating@2x-rotated.bmp updating-r.bmp
+cp $ASSETS/bootlogo@2x-rotated.bmp bootlogo-r.bmp
+cp $ASSETS/installing@2x-square.bmp installing-s.bmp
+cp $ASSETS/updating@2x-square.bmp updating-s.bmp
+cp $ASSETS/bootlogo@2x-square.bmp bootlogo-s.bmp
+cp $ASSETS/installing@2x-wide.bmp installing-w.bmp
+cp $ASSETS/updating@2x-wide.bmp updating-w.bmp
+cp $ASSETS/bootlogo@2x-wide.bmp bootlogo-w.bmp
+
 mkdir -p output
 if [ ! -f output/installing ]; then
 	dd skip=54 iflag=skip_bytes if=installing.bmp of=output/installing
