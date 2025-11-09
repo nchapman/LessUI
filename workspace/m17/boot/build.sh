@@ -4,10 +4,11 @@
 
 TARGET=em_ui.sh
 
-# Copy boot assets from central location
-ASSETS=../../skeleton/SYSTEM/res
-cp $ASSETS/installing@1x-wide.bmp installing.bmp
-cp $ASSETS/updating@1x-wide.bmp updating.bmp
+# Boot assets are copied to this directory during HOST setup phase
+# (see Makefile setup target - copies from skeleton/SYSTEM/res/)
+# Rename from @Nx format to standard names
+cp installing@1x-wide.bmp installing.bmp
+cp updating@1x-wide.bmp updating.bmp
 
 # remove header from bitmaps
 mkdir -p output

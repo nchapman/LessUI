@@ -2,11 +2,8 @@
 
 TARGET=dmenu.bin
 
-# Copy boot assets from central location
-ASSETS=../../skeleton/SYSTEM/res
-cp $ASSETS/installing@2x.bmp installing.bmp
-cp $ASSETS/updating@2x.bmp updating.bmp
-cp $ASSETS/bootlogo@2x.png boot_logo.png
+# Boot assets are copied to this directory during HOST setup phase
+# (see Makefile setup target - copies from skeleton/SYSTEM/res/)
 
 mkdir -p output
 # Skip standard 54-byte BMP header (now using 24-bit BMPs)
