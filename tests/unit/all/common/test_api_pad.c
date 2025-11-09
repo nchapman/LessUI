@@ -150,6 +150,44 @@ void test_PAD_setAnalog_already_pressed_doesnt_trigger_just_pressed(void) {
 	TEST_ASSERT_FALSE(pad.just_pressed & BTN_ANALOG_RIGHT);
 }
 
+void test_PAD_setAnalog_release_clears_just_repeated(void) {
+	// Press right analog
+	PAD_setAnalog(BTN_ID_ANALOG_LEFT, BTN_ID_ANALOG_RIGHT, 20000, 1000);
+	TEST_ASSERT_TRUE(pad.just_repeated & BTN_ANALOG_RIGHT);
+
+	// Clear transient state
+	pad.just_pressed = BTN_NONE;
+	pad.just_released = BTN_NONE;
+	pad.just_repeated = BTN_NONE;
+
+	// Manually set just_repeated (simulating button held for repeat)
+	pad.just_repeated = BTN_ANALOG_RIGHT | BTN_A;
+
+	// Return analog to neutral - should clear ONLY ANALOG_RIGHT from just_repeated
+	PAD_setAnalog(BTN_ID_ANALOG_LEFT, BTN_ID_ANALOG_RIGHT, 0, 2000);
+
+	// just_repeated should have ANALOG_RIGHT cleared, but BTN_A should remain
+	TEST_ASSERT_FALSE(pad.just_repeated & BTN_ANALOG_RIGHT);
+	TEST_ASSERT_TRUE(pad.just_repeated & BTN_A);
+}
+
+void test_PAD_setAnalog_release_with_multiple_buttons_repeated(void) {
+	// Setup: Multiple buttons are in just_repeated state
+	pad.is_pressed = BTN_ANALOG_LEFT | BTN_ANALOG_RIGHT;
+	pad.just_repeated = BTN_ANALOG_LEFT | BTN_ANALOG_RIGHT | BTN_B | BTN_SELECT;
+
+	// Release right analog (return to neutral)
+	PAD_setAnalog(BTN_ID_ANALOG_LEFT, BTN_ID_ANALOG_RIGHT, 0, 1000);
+
+	// Verify: ONLY the released buttons cleared from just_repeated
+	TEST_ASSERT_FALSE(pad.just_repeated & BTN_ANALOG_RIGHT);
+	TEST_ASSERT_FALSE(pad.just_repeated & BTN_ANALOG_LEFT);
+
+	// Other buttons in just_repeated should remain untouched
+	TEST_ASSERT_TRUE(pad.just_repeated & BTN_B);
+	TEST_ASSERT_TRUE(pad.just_repeated & BTN_SELECT);
+}
+
 ///////////////////////////////
 // PAD query function tests
 ///////////////////////////////
@@ -322,6 +360,8 @@ int main(void) {
 	RUN_TEST(test_PAD_setAnalog_opposite_direction_cancels_previous);
 	RUN_TEST(test_PAD_setAnalog_return_to_neutral_releases_both);
 	RUN_TEST(test_PAD_setAnalog_already_pressed_doesnt_trigger_just_pressed);
+	RUN_TEST(test_PAD_setAnalog_release_clears_just_repeated);
+	RUN_TEST(test_PAD_setAnalog_release_with_multiple_buttons_repeated);
 
 	// PAD query function tests
 	RUN_TEST(test_PAD_anyJustPressed_returns_true_when_button_just_pressed);

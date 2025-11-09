@@ -65,12 +65,12 @@ void PAD_setAnalog(int neg_id, int pos_id, int value, int repeat_at) {
 	} else { // not pressing
 		if (pad.is_pressed & neg) { // was pressing
 			pad.is_pressed &= ~neg; // unset
-			pad.just_repeated &= neg; // unset
+			pad.just_repeated &= ~neg; // unset
 			pad.just_released |= neg; // set
 		}
 		if (pad.is_pressed & pos) { // was pressing
 			pad.is_pressed &= ~pos; // unset
-			pad.just_repeated &= pos; // unset
+			pad.just_repeated &= ~pos; // unset
 			pad.just_released |= pos; // set
 		}
 	}
