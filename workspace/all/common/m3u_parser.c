@@ -103,6 +103,8 @@ M3U_Disc** M3U_getAllDiscs(char* m3u_path, int* disc_count) {
 				disc_num++;
 
 				M3U_Disc* disc = malloc(sizeof(M3U_Disc));
+				if (!disc)
+					continue; // Skip this disc if allocation fails
 				disc->path = strdup(disc_path);
 
 				char name[16];

@@ -3846,7 +3846,7 @@ int OptionControls_bind(MenuList* list, int i) {
 
 		// NOTE: off by one because of the initial NONE value
 		for (int id = 0; id <= LOCAL_BUTTON_COUNT; id++) {
-			if (PAD_justPressed(1 << (id - 1))) {
+			if (id > 0 && PAD_justPressed(1 << (id - 1))) {
 				item->value = id;
 				button->local = id - 1;
 				if (PAD_isPressed(BTN_MENU)) {
@@ -3963,7 +3963,7 @@ static int OptionShortcuts_bind(MenuList* list, int i) {
 
 		// NOTE: off by one because of the initial NONE value
 		for (int id = 0; id <= LOCAL_BUTTON_COUNT; id++) {
-			if (PAD_justPressed(1 << (id - 1))) {
+			if (id > 0 && PAD_justPressed(1 << (id - 1))) {
 				item->value = id;
 				button->local = id - 1;
 				if (PAD_isPressed(BTN_MENU)) {
@@ -4709,7 +4709,7 @@ static void Menu_loadState(void) {
 	}
 }
 
-static char* getAlias(char* path, char* alias) {
+static void getAlias(char* path, char* alias) {
 	// LOG_info("alias path: %s\n", path);
 	char* tmp;
 	char map_path[256];

@@ -29,6 +29,8 @@ Collection_Entry** Collection_parse(char* collection_path, const char* sdcard_pa
 
 	// Allocate space for up to 100 entries
 	Collection_Entry** entries = malloc(sizeof(Collection_Entry*) * 100);
+	if (!entries)
+		return NULL;
 
 	FILE* file = fopen(collection_path, "r");
 	if (file) {
@@ -46,6 +48,9 @@ Collection_Entry** Collection_parse(char* collection_path, const char* sdcard_pa
 			// Only include ROMs that exist
 			if (exists(sd_path)) {
 				Collection_Entry* entry = malloc(sizeof(Collection_Entry));
+				if (!entry)
+					continue; // Skip this entry if allocation fails
+
 				entry->path = strdup(sd_path);
 				entry->is_pak = suffixMatch(".pak", sd_path);
 

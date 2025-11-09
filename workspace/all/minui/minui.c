@@ -1663,6 +1663,7 @@ static void Entry_open(Entry* self) {
 	recent_alias = self->name; // Passed to addRecent via global
 	if (self->type == ENTRY_ROM) {
 		char* last = NULL;
+		char last_path[256]; // Moved outside if block to fix invalidLifetime bug
 		// Collection ROMs use collection path for state restoration
 		if (prefixMatch(COLLECTIONS_PATH, top->path)) {
 			char* tmp;
@@ -1672,7 +1673,6 @@ static void Entry_open(Entry* self) {
 			if (tmp)
 				strcpy(filename, tmp + 1);
 
-			char last_path[256];
 			sprintf(last_path, "%s/%s", top->path, filename);
 			last = last_path;
 		}
