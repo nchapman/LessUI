@@ -45,9 +45,15 @@ src/$(1)/.patched-all:
 	
 
 output/$(1)_libretro.so: src/$(1)/.patched src/$(1)/.patched-all
-	mkdir -p output
-	cd src/$$($1_BUILD_PATH) && $$($1_MAKE) $(PROCS)
-	mv src/$$($1_BUILD_PATH)/$(if $($(1)_CORE),$($(1)_CORE),$(1)_libretro.so) ./output
+	@mkdir -p output
+	@if [ ! -f output/$(1)_libretro.so ] || [ -n "$$$$(find src/$(1) -newer output/$(1)_libretro.so -print -quit 2>/dev/null)" ]; then \
+		echo "Building $(1)..."; \
+		(cd src/$$($1_BUILD_PATH) && $$($1_MAKE) $(PROCS)) && \
+		mv -f src/$$($1_BUILD_PATH)/$(if $($(1)_CORE),$($(1)_CORE),$(1)_libretro.so) ./output/ && \
+		touch output/$(1)_libretro.so; \
+	else \
+		echo "$(1) is up to date"; \
+	fi
 
 clone-$(1): src/$(1)
 
