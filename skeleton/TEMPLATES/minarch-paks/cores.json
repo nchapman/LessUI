@@ -95,7 +95,7 @@
       "emu_exe": "flycast-xtreme",
       "bundled_core": true
     },
-    "A26": {
+    "A2600": {
       "emu_exe": "stella",
       "bundled_core": true
     },
@@ -103,11 +103,11 @@
       "emu_exe": "beetle-lynx",
       "bundled_core": true
     },
-    "A52": {
+    "A5200": {
       "emu_exe": "atari800",
       "bundled_core": true
     },
-    "A78": {
+    "A7800": {
       "emu_exe": "prosystem",
       "bundled_core": true
     },
@@ -133,6 +133,42 @@
     },
     "SCUMM": {
       "emu_exe": "scummvm",
+      "bundled_core": true
+    },
+    "32X": {
+      "emu_exe": "picodrive",
+      "bundled_core": true
+    },
+    "SEGACD": {
+      "emu_exe": "picodrive",
+      "bundled_core": true
+    },
+    "SG1000": {
+      "emu_exe": "picodrive",
+      "bundled_core": true
+    },
+    "FDS": {
+      "emu_exe": "fceumm",
+      "bundled_core": true
+    },
+    "COLECO": {
+      "emu_exe": "bluemsx",
+      "bundled_core": true
+    },
+    "C128": {
+      "emu_exe": "vice",
+      "bundled_core": true
+    },
+    "VIC": {
+      "emu_exe": "vice",
+      "bundled_core": true
+    },
+    "PLUS4": {
+      "emu_exe": "vice",
+      "bundled_core": true
+    },
+    "PET": {
+      "emu_exe": "vice",
       "bundled_core": true
     }
   }
