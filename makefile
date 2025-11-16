@@ -184,6 +184,10 @@ setup: name
 	# Deploy shared cores
 	@make cores-download
 
+	# Generate platform-specific paks from templates
+	@echo "Generating paks from templates..."
+	@./scripts/generate-paks.sh all
+
 # Signal build completion (macOS only - harmless on Linux)
 done:
 	say "done" 2>/dev/null || true

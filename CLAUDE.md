@@ -107,6 +107,38 @@ make PLATFORM=miyoomini build
 
 Active platforms (as of most recent): miyoomini, trimuismart, rg35xx, rg35xxplus, my355, tg5040, zero28, rgb30, m17, gkdpixel, my282, magicmini
 
+### Pak Template System
+
+LessUI uses a **template-based system** to generate platform-specific `.pak` directories, eliminating duplication across platforms.
+
+**Location:** `skeleton/TEMPLATES/paks/`
+
+**How it works:**
+- `platforms.json` - Platform metadata (nice prefix, default settings)
+- `cores.json` - Core definitions (8 stock + 11 extra cores)
+- `launch.sh.template` - Launch script template with placeholders
+- `configs/` - Config templates for each core (19 total)
+
+**Generation:**
+```bash
+# Automatic during build
+make setup  # Generates all paks
+
+# Manual generation
+./scripts/generate-paks.sh all              # All platforms
+./scripts/generate-paks.sh miyoomini        # Specific platform
+./scripts/generate-paks.sh miyoomini GB GBA # Specific cores
+```
+
+**Adding a new core:**
+1. Add to `skeleton/TEMPLATES/cores.json`
+2. Create `skeleton/TEMPLATES/paks/configs/<CORE>.cfg`
+3. Run `./scripts/generate-paks.sh all`
+
+**Key benefit:** Edit one template → updates all 12 platforms (96 SYSTEM + 132 EXTRAS paks generated from 19 templates)
+
+See `docs/PAK-TEMPLATES.md` for comprehensive documentation.
+
 ## Development Commands
 
 ### macOS Native Development (makefile.dev)
