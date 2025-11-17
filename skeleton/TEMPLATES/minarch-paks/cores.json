@@ -21,7 +21,7 @@
     "SFC": {
       "emu_exe": "snes9x2005_plus"
     },
-    "NEOGEO": {
+    "FBN": {
       "emu_exe": "fbneo"
     },
     "CPS1": {
@@ -32,6 +32,9 @@
     },
     "CPS3": {
       "emu_exe": "fbneo"
+    },
+    "MAME": {
+      "emu_exe": "mame2003_plus"
     }
   },
   "extra_cores": {
