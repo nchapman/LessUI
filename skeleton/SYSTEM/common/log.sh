@@ -33,7 +33,8 @@
 # Configuration
 ###############################################################################
 
-LOG_FILE=""
+# Only set LOG_FILE if not already set by the calling script
+: "${LOG_FILE:=}"
 LOG_ENABLED=1
 LOG_MAX_SIZE=1048576  # 1MB in bytes
 LOG_MAX_BACKUPS=3
