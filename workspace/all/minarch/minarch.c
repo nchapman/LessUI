@@ -1497,7 +1497,7 @@ static void Config_load(void) {
 		sprintf(device_system_path, SYSTEM_PATH "/system-%s.cfg", config.device_tag);
 
 	if (config.device_tag && exists(device_system_path)) {
-		LOG_info("usng device_system_path: %s", device_system_path);
+		LOG_info("using device_system_path: %s", device_system_path);
 		config.system_cfg = allocFile(device_system_path);
 	} else if (exists(system_path))
 		config.system_cfg = allocFile(system_path);
@@ -1521,7 +1521,7 @@ static void Config_load(void) {
 	}
 
 	if (config.device_tag && exists(device_default_path)) {
-		LOG_info("usng device_default_path: %s", device_default_path);
+		LOG_info("using device_default_path: %s", device_default_path);
 		config.default_cfg = allocFile(device_default_path);
 	} else if (exists(default_path))
 		config.default_cfg = allocFile(default_path);

@@ -46,6 +46,12 @@ mkdir -p "$USERDATA_PATH"
 mkdir -p "$LOGS_PATH"
 mkdir -p "$SHARED_USERDATA_PATH/.minui"
 
+# Source logging library with rotation (if available)
+if [ -f "$SDCARD_PATH/.system/common/log.sh" ]; then
+	. "$SDCARD_PATH/.system/common/log.sh"
+	log_init "$LOGS_PATH/minui.log"
+fi
+
 #######################################
 
 export CPU_SPEED_MENU=504000

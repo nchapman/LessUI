@@ -36,8 +36,10 @@
 #ifndef __LOG_H__
 #define __LOG_H__
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <string.h>
 
 ///////////////////////////////
 // Log Levels

@@ -2,9 +2,14 @@
 
 TF1_PATH=/mnt/mmc # TF1/NO NAME partition
 TF2_PATH=/mnt/sdcard # TF2
+LOG_FILE="$TF1_PATH/lessui-install.log"
 
-rm $TF1_PATH/boot.log
-touch $TF1_PATH/boot.log
+# Embedded logging (same format as log.sh)
+log_write() {
+	echo "[$1] $2" >> "$LOG_FILE"
+}
+log_info() { log_write "INFO" "$*"; }
+log_error() { log_write "ERROR" "$*"; }
 
 RGXX_MODEL=`strings /mnt/vendor/bin/dmenu.bin | grep ^RG`
 
@@ -76,10 +81,10 @@ if [ -f $UPDATE_PATH ]; then
 	
 	if [ ! -d $SYSTEM_PATH ]; then
 		ACTION=installing
-		echo "install LessUI" >> $TF1_PATH/boot.log
+		ACTION_NOUN="installation"
 	else
 		ACTION=updating
-		echo "update LessUI" >> $TF1_PATH/boot.log
+		ACTION_NOUN="update"
 	fi
 	
 	# extract tar.gz from this sh file
@@ -105,17 +110,30 @@ if [ -f $UPDATE_PATH ]; then
 		rm -rf $BOOT_PATH
 	fi
 
-	/tmp/unzip -o $UPDATE_PATH -d $SDCARD_PATH >> $TF1_PATH/boot.log
+	log_info "Starting LessUI $ACTION_NOUN..."
+	if /tmp/unzip -o $UPDATE_PATH -d $SDCARD_PATH >> "$LOG_FILE" 2>&1; then
+		log_info "Unzip complete"
+	else
+		EXIT_CODE=$?
+		log_error "Unzip failed with exit code $EXIT_CODE"
+	fi
 	rm -f $UPDATE_PATH
 
 	# ls -la $SDCARD_PATH >> $TF1_PATH/boot.log
-	
+
 	# cd /tmp
 	# rm data installing updating bootlogo.bmp installing-r updating-r bootlogo-r.bmp unzip
 
 	# the updated system finishes the install/update
-	echo "finishing update..." >> $TF1_PATH/boot.log
-	$SYSTEM_PATH/bin/install.sh >> $TF1_PATH/boot.log
+	if [ -f $SYSTEM_PATH/bin/install.sh ]; then
+		log_info "Running install.sh..."
+		if $SYSTEM_PATH/bin/install.sh >> "$LOG_FILE" 2>&1; then
+			log_info "Installation complete"
+		else
+			EXIT_CODE=$?
+			log_error "install.sh failed with exit code $EXIT_CODE"
+		fi
+	fi
 fi
 
 if [ -f $SYSTEM_PATH/paks/MinUI.pak/launch.sh ]; then
