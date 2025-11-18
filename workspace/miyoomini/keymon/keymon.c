@@ -47,6 +47,8 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 
+#include "../../all/common/log.h"
+
 // Button code definitions (from Linux input.h)
 #define	BUTTON_MENU		KEY_ESC
 #define	BUTTON_POWER	KEY_POWER
@@ -77,11 +79,11 @@
 #define START		(1<<START_BIT)
 
 // Debug error handling
-//#define	DEBUG
-#ifdef	DEBUG
-#define ERROR(str)	fprintf(stderr,str"\n"); quit(EXIT_FAILURE)
+// #define DEBUG  // Replaced with LOG system
+#if 0  // Replaced with LOG system
+#define ERROR(str) do { LOG_error(str); quit(EXIT_FAILURE); } while(0)
 #else
-#define ERROR(str)	quit(EXIT_FAILURE)
+#define ERROR(str) do { LOG_error(str); quit(EXIT_FAILURE); } while(0)
 #endif
 
 // Miyoo Mini Plus AXP223 PMIC I2C configuration (via eggs)
@@ -290,6 +292,19 @@ static void checkADC(void) {
 
 	int current_charge = getADCValue();
 
+	// Log battery warnings
+	if (!is_charging) {
+		if (current_charge <= 5) {
+			LOG_warn("Battery critically low: %d%%", current_charge);
+		} else if (current_charge <= 10) {
+			static int last_warn = 0;
+			if (current_charge < last_warn) {  // Only warn when dropping
+				LOG_warn("Battery low: %d%%", current_charge);
+				last_warn = current_charge;
+			}
+		}
+	}
+
 	static int first_run = 1;
 	if (first_run || (was_charging && !is_charging)) {
 		// Immediately update on first run or when unplugging fully charged
@@ -309,12 +324,14 @@ static void checkADC(void) {
 
 	// Write battery percentage to file for MinUI to read
 	int bat_fd = open("/tmp/battery", O_CREAT | O_WRONLY | O_TRUNC);
-	if (bat_fd>0) {
-		char value[3];
-		sprintf(value, "%d", eased_charge);
-		write(bat_fd, value, strlen(value));
-		close(bat_fd);
+	if (bat_fd < 0) {
+		LOG_error("Failed to write battery status to /tmp/battery");
+		return;
 	}
+	char value[3];
+	sprintf(value, "%d", eased_charge);
+	write(bat_fd, value, strlen(value));
+	close(bat_fd);
 }
 
 /**

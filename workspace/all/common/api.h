@@ -12,40 +12,10 @@
 #ifndef __API_H__
 #define __API_H__
 #include "defines.h"
+#include "log.h"
 #include "platform.h"
 #include "scaler.h"
 #include "sdl.h"
-
-///////////////////////////////
-// Logging
-///////////////////////////////
-
-/**
- * Log severity levels.
- */
-enum {
-	LOG_DEBUG = 0, // Detailed debug information
-	LOG_INFO, // General informational messages
-	LOG_WARN, // Warning messages
-	LOG_ERROR, // Error messages
-};
-
-/**
- * Convenience macros for logging at different severity levels.
- */
-#define LOG_debug(fmt, ...) LOG_note(LOG_DEBUG, fmt, ##__VA_ARGS__)
-#define LOG_info(fmt, ...) LOG_note(LOG_INFO, fmt, ##__VA_ARGS__)
-#define LOG_warn(fmt, ...) LOG_note(LOG_WARN, fmt, ##__VA_ARGS__)
-#define LOG_error(fmt, ...) LOG_note(LOG_ERROR, fmt, ##__VA_ARGS__)
-
-/**
- * Logs a formatted message at the specified severity level.
- *
- * @param level Log severity (LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR)
- * @param fmt Printf-style format string
- * @param ... Format arguments
- */
-void LOG_note(int level, const char* fmt, ...);
 
 ///////////////////////////////
 // Video page buffer constants

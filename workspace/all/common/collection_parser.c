@@ -7,7 +7,9 @@
 #define _POSIX_C_SOURCE 200809L // Required for strdup()
 
 #include "collection_parser.h"
+#include "log.h"
 #include "utils.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,11 +31,18 @@ Collection_Entry** Collection_parse(char* collection_path, const char* sdcard_pa
 
 	// Allocate space for up to 100 entries
 	Collection_Entry** entries = malloc(sizeof(Collection_Entry*) * 100);
-	if (!entries)
+	if (!entries) {
+		LOG_error("Failed to allocate memory for collection entries");
 		return NULL;
+	}
 
 	FILE* file = fopen(collection_path, "r");
-	if (file) {
+	if (!file) {
+		LOG_errno("Failed to open collection file %s", collection_path);
+		return entries;
+	}
+
+	{
 		char line[256];
 		while (fgets(line, 256, file) != NULL && *entry_count < 100) {
 			normalizeNewline(line);
@@ -48,13 +57,16 @@ Collection_Entry** Collection_parse(char* collection_path, const char* sdcard_pa
 			// Only include ROMs that exist
 			if (exists(sd_path)) {
 				Collection_Entry* entry = malloc(sizeof(Collection_Entry));
-				if (!entry)
-					continue; // Skip this entry if allocation fails
+				if (!entry) {
+					LOG_warn("Failed to allocate memory for collection entry");
+					continue;
+				}
 
 				entry->path = strdup(sd_path);
 				if (!entry->path) {
+					LOG_warn("Failed to duplicate collection path: %s", sd_path);
 					free(entry);
-					continue; // Skip this entry if strdup fails
+					continue;
 				}
 				entry->is_pak = suffixMatch(".pak", sd_path);
 

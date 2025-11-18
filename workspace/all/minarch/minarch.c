@@ -334,7 +334,7 @@ static struct Game {
  * @note For ZIP files, extracts to /tmp/minarch-XXXXXX/ (deleted on close)
  */
 static void Game_open(char* path) {
-	LOG_info("Game_open\n");
+	LOG_info("Game_open");
 	memset(&game, 0, sizeof(game));
 
 	strcpy((char*)game.path, path);
@@ -342,7 +342,7 @@ static void Game_open(char* path) {
 
 	// if we have a zip file
 	if (suffixMatch(".zip", game.path)) {
-		LOG_info("is zip file\n");
+		LOG_info("is zip file");
 		int supports_zip = 0;
 		int i = 0;
 		char* ext;
@@ -362,7 +362,7 @@ static void Game_open(char* path) {
 		if (!supports_zip) {
 			FILE* zip = fopen(game.path, "r");
 			if (zip == NULL) {
-				LOG_error("Error opening archive: %s\n\t%s\n", game.path, strerror(errno));
+				LOG_error("Error opening archive: %s\n\t%s", game.path, strerror(errno));
 				return;
 			}
 
@@ -390,7 +390,7 @@ static void Game_open(char* path) {
 				if (len != fread(filename, 1, len, zip))
 					break;
 				filename[len] = '\0';
-				LOG_info("filename: %s\n", filename);
+				LOG_info("filename: %s", filename);
 
 				compressed_size = ZIP_LE_READ32(&header[18]);
 
@@ -411,7 +411,7 @@ static void Game_open(char* path) {
 				char tmp_template[MAX_PATH];
 				strcpy(tmp_template, "/tmp/minarch-XXXXXX");
 				char* tmp_dirname = mkdtemp(tmp_template);
-				// LOG_info("tmp_dirname: %s\n", tmp_dirname);
+				// LOG_info("tmp_dirname: %s", tmp_dirname);
 				sprintf(game.tmp_path, "%s/%s", tmp_dirname, basename(filename));
 
 				// TODO: we need to clear game.tmp_path if anything below this point fails!
@@ -419,7 +419,7 @@ static void Game_open(char* path) {
 				FILE* dst = fopen(game.tmp_path, "w");
 				if (dst == NULL) {
 					game.tmp_path[0] = '\0';
-					LOG_error("Error extracting file: %s\n\t%s\n", filename, strerror(errno));
+					LOG_error("Error extracting file: %s\n\t%s", filename, strerror(errno));
 					return;
 				}
 
@@ -435,7 +435,7 @@ static void Game_open(char* path) {
 
 				if (!extract || extract(zip, dst, compressed_size)) {
 					game.tmp_path[0] = '\0';
-					LOG_error("Error extracting file: %s\n\t%s\n", filename, strerror(errno));
+					LOG_error("Error extracting file: %s\n\t%s", filename, strerror(errno));
 					return;
 				}
 
@@ -455,7 +455,7 @@ static void Game_open(char* path) {
 
 		FILE* file = fopen(path, "r");
 		if (file == NULL) {
-			LOG_error("Error opening game: %s\n\t%s\n", path, strerror(errno));
+			LOG_error("Error opening game: %s\n\t%s", path, strerror(errno));
 			return;
 		}
 
@@ -465,7 +465,7 @@ static void Game_open(char* path) {
 		rewind(file);
 		game.data = malloc(game.size);
 		if (game.data == NULL) {
-			LOG_error("Couldn't allocate memory for file: %s\n", path);
+			LOG_error("Couldn't allocate memory for file: %s", path);
 			return;
 		}
 
@@ -590,7 +590,7 @@ static void SRAM_read(void) {
 	void* sram = core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
 
 	if (!sram || !fread(sram, 1, sram_size, sram_file)) {
-		LOG_error("Error reading SRAM data\n");
+		LOG_error("Error reading SRAM data");
 	}
 
 	fclose(sram_file);
@@ -616,14 +616,14 @@ static void SRAM_write(void) {
 
 	FILE* sram_file = fopen(filename, "w");
 	if (!sram_file) {
-		LOG_error("Error opening SRAM file: %s\n", strerror(errno));
+		LOG_error("Error opening SRAM file: %s", strerror(errno));
 		return;
 	}
 
 	void* sram = core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
 
 	if (!sram || sram_size != fwrite(sram, 1, sram_size, sram_file)) {
-		LOG_error("Error writing SRAM data to file\n");
+		LOG_error("Error writing SRAM data to file");
 	}
 
 	fclose(sram_file);
@@ -662,7 +662,7 @@ static void RTC_read(void) {
 	void* rtc = core.get_memory_data(RETRO_MEMORY_RTC);
 
 	if (!rtc || !fread(rtc, 1, rtc_size, rtc_file)) {
-		LOG_error("Error reading RTC data\n");
+		LOG_error("Error reading RTC data");
 	}
 
 	fclose(rtc_file);
@@ -684,14 +684,14 @@ static void RTC_write(void) {
 
 	FILE* rtc_file = fopen(filename, "w");
 	if (!rtc_file) {
-		LOG_error("Error opening RTC file: %s\n", strerror(errno));
+		LOG_error("Error opening RTC file: %s", strerror(errno));
 		return;
 	}
 
 	void* rtc = core.get_memory_data(RETRO_MEMORY_RTC);
 
 	if (!rtc || rtc_size != fwrite(rtc, 1, rtc_size, rtc_file)) {
-		LOG_error("Error writing RTC data to file\n");
+		LOG_error("Error writing RTC data to file");
 	}
 
 	fclose(rtc_file);
@@ -736,7 +736,7 @@ static void State_read(void) {
 
 	void* state = calloc(1, state_size);
 	if (!state) {
-		LOG_error("Couldn't allocate memory for state\n");
+		LOG_error("Couldn't allocate memory for state");
 		goto error;
 	}
 
@@ -746,7 +746,7 @@ static void State_read(void) {
 	FILE* state_file = fopen(filename, "r");
 	if (!state_file) {
 		if (state_slot != 8) { // st8 is a default state in MiniUI and may not exist, that's okay
-			LOG_error("Error opening state file: %s (%s)\n", filename, strerror(errno));
+			LOG_error("Error opening state file: %s (%s)", filename, strerror(errno));
 		}
 		goto error;
 	}
@@ -754,12 +754,12 @@ static void State_read(void) {
 	// some cores report the wrong serialize size initially for some games, eg. mgba: Wario Land 4
 	// so we allow a size mismatch as long as the actual size fits in the buffer we've allocated
 	if (state_size < fread(state, 1, state_size, state_file)) {
-		LOG_error("Error reading state data from file: %s (%s)\n", filename, strerror(errno));
+		LOG_error("Error reading state data from file: %s (%s)", filename, strerror(errno));
 		goto error;
 	}
 
 	if (!core.unserialize(state, state_size)) {
-		LOG_error("Error restoring save state: %s (%s)\n", filename, strerror(errno));
+		LOG_error("Error restoring save state: %s (%s)", filename, strerror(errno));
 		goto error;
 	}
 
@@ -791,7 +791,7 @@ static void State_write(void) {
 
 	void* state = calloc(1, state_size);
 	if (!state) {
-		LOG_error("Couldn't allocate memory for state\n");
+		LOG_error("Couldn't allocate memory for state");
 		goto error;
 	}
 
@@ -800,17 +800,17 @@ static void State_write(void) {
 
 	FILE* state_file = fopen(filename, "w");
 	if (!state_file) {
-		LOG_error("Error opening state file: %s (%s)\n", filename, strerror(errno));
+		LOG_error("Error opening state file: %s (%s)", filename, strerror(errno));
 		goto error;
 	}
 
 	if (!core.serialize(state, state_size)) {
-		LOG_error("Error creating save state: %s (%s)\n", filename, strerror(errno));
+		LOG_error("Error creating save state: %s (%s)", filename, strerror(errno));
 		goto error;
 	}
 
 	if (state_size != fwrite(state, 1, state_size, state_file)) {
-		LOG_error("Error writing state data to file: %s (%s)\n", filename, strerror(errno));
+		LOG_error("Error writing state data to file: %s (%s)", filename, strerror(errno));
 		goto error;
 	}
 
@@ -1198,7 +1198,7 @@ static int Config_getValue(char* cfg, const char* key, char* out_value,
 	if (tmp)
 		*tmp = '\0';
 
-	// LOG_info("\t%s = %s (%s)\n", key, out_value, (lock && *lock) ? "hidden":"shown");
+	// LOG_info("\t%s = %s (%s)", key, out_value, (lock && *lock) ? "hidden":"shown");
 	return 1;
 }
 
@@ -1279,7 +1279,7 @@ static void Config_getPath(char* filename, int override) {
 		sprintf(filename, "%s/%s%s.cfg", core.config_dir, game.name, device_tag);
 	else
 		sprintf(filename, "%s/minarch%s.cfg", core.config_dir, device_tag);
-	LOG_info("Config_getPath %s\n", filename);
+	LOG_info("Config_getPath %s", filename);
 }
 
 ///////////////////////////////////////
@@ -1302,7 +1302,7 @@ static void Config_init(void) {
 	if (!config.default_cfg || config.initialized)
 		return;
 
-	LOG_info("Config_init\n");
+	LOG_info("Config_init");
 	char* tmp = config.default_cfg;
 	char* tmp2;
 	char* key;
@@ -1356,7 +1356,7 @@ static void Config_init(void) {
 
 		tmp += strlen(button_id); // prepare to continue search
 
-		LOG_info("\tbind %s (%s) %i:%i\n", button_name, button_id, local_id, retro_id);
+		LOG_info("\tbind %s (%s) %i:%i", button_name, button_id, local_id, retro_id);
 
 		// TODO: test this without a final line return
 		tmp2 = calloc(strlen(button_name) + 1, sizeof(char));
@@ -1387,7 +1387,7 @@ static void Config_readOptionsString(char* cfg) {
 	if (!cfg)
 		return;
 
-	LOG_info("Config_readOptions\n");
+	LOG_info("Config_readOptions");
 	char key[256];
 	char value[256];
 	for (int i = 0; config.frontend.options[i].key; i++) {
@@ -1415,7 +1415,7 @@ static void Config_readControlsString(char* cfg) {
 	if (!cfg)
 		return;
 
-	LOG_info("Config_readControlsString\n");
+	LOG_info("Config_readControlsString");
 
 	char key[256];
 	char value[256];
@@ -1437,7 +1437,7 @@ static void Config_readControlsString(char* cfg) {
 				break;
 			}
 		}
-		// LOG_info("\t%s (%i)\n", value, id);
+		// LOG_info("\t%s (%i)", value, id);
 
 		int mod = 0;
 		if (id >= LOCAL_BUTTON_COUNT) {
@@ -1470,17 +1470,17 @@ static void Config_readControlsString(char* cfg) {
 			id -= LOCAL_BUTTON_COUNT;
 			mod = 1;
 		}
-		// LOG_info("shortcut %s:%s (%i:%i)\n", key,value, id, mod);
+		// LOG_info("shortcut %s:%s (%i:%i)", key,value, id, mod);
 
 		mapping->local = id;
 		mapping->mod = mod;
 	}
 }
 static void Config_load(void) {
-	LOG_info("Config_load\n");
+	LOG_info("Config_load");
 
 	config.device_tag = getenv("DEVICE");
-	LOG_info("config.device_tag %s\n", config.device_tag);
+	LOG_info("config.device_tag %s", config.device_tag);
 
 	// update for crop overscan support
 	Option* scaling_option = &config.frontend.options[FE_OPT_SCALING];
@@ -1497,14 +1497,14 @@ static void Config_load(void) {
 		sprintf(device_system_path, SYSTEM_PATH "/system-%s.cfg", config.device_tag);
 
 	if (config.device_tag && exists(device_system_path)) {
-		LOG_info("usng device_system_path: %s\n", device_system_path);
+		LOG_info("usng device_system_path: %s", device_system_path);
 		config.system_cfg = allocFile(device_system_path);
 	} else if (exists(system_path))
 		config.system_cfg = allocFile(system_path);
 	else
 		config.system_cfg = NULL;
 
-	// LOG_info("config.system_cfg: %s\n", config.system_cfg);
+	// LOG_info("config.system_cfg: %s", config.system_cfg);
 
 	char default_path[MAX_PATH];
 	getEmuPath((char*)core.tag, default_path);
@@ -1521,14 +1521,14 @@ static void Config_load(void) {
 	}
 
 	if (config.device_tag && exists(device_default_path)) {
-		LOG_info("usng device_default_path: %s\n", device_default_path);
+		LOG_info("usng device_default_path: %s", device_default_path);
 		config.default_cfg = allocFile(device_default_path);
 	} else if (exists(default_path))
 		config.default_cfg = allocFile(default_path);
 	else
 		config.default_cfg = NULL;
 
-	// LOG_info("config.default_cfg: %s\n", config.default_cfg);
+	// LOG_info("config.default_cfg: %s", config.default_cfg);
 
 	char path[MAX_PATH];
 	config.loaded = CONFIG_NONE;
@@ -1543,7 +1543,7 @@ static void Config_load(void) {
 	if (!config.user_cfg)
 		return;
 
-	LOG_info("using user config: %s\n", path);
+	LOG_info("Loaded user config: %s", path);
 
 	config.loaded = override ? CONFIG_GAME : CONFIG_CONSOLE;
 }
@@ -1620,14 +1620,14 @@ static void Config_restore(void) {
 		else
 			sprintf(path, "%s/%s.cfg", core.config_dir, game.name);
 		unlink(path);
-		LOG_info("deleted game config: %s\n", path);
+		LOG_info("Deleted game config: %s", path);
 	} else if (config.loaded == CONFIG_CONSOLE) {
 		if (config.device_tag)
 			sprintf(path, "%s/minarch-%s.cfg", core.config_dir, config.device_tag);
 		else
 			sprintf(path, "%s/minarch.cfg", core.config_dir);
 		unlink(path);
-		LOG_info("deleted console config: %s\n", path);
+		LOG_info("Deleted console config: %s", path);
 	}
 	config.loaded = CONFIG_NONE;
 
@@ -1671,7 +1671,7 @@ static struct Special {
 	int palette_updated;
 } special;
 static void Special_updatedDMGPalette(int frames) {
-	// LOG_info("Special_updatedDMGPalette(%i)\n", frames);
+	// LOG_info("Special_updatedDMGPalette(%i)", frames);
 	special.palette_updated = frames; // must wait a few frames
 }
 static void Special_refreshDMGPalette(void) {
@@ -1727,12 +1727,12 @@ static const char* getOptionNameFromKey(const char* key, const char* name) {
 
 // the following 3 functions always touch config.core, the rest can operate on arbitrary OptionLists
 static void OptionList_init(const struct retro_core_option_definition* defs) {
-	LOG_info("OptionList_init\n");
+	LOG_info("OptionList_init");
 	int count;
 	for (count = 0; defs[count].key; count++)
 		;
 
-	// LOG_info("count: %i\n", count);
+	// LOG_info("count: %i", count);
 
 	// TODO: add frontend options to this? so the can use the same override method? eg. minarch_*
 
@@ -1797,13 +1797,13 @@ static void OptionList_init(const struct retro_core_option_definition* defs) {
 			item->value = Option_getValueIndex(item, def->default_value);
 			item->default_value = item->value;
 
-			// LOG_info("\tINIT %s (%s) TO %s (%s)\n", item->name, item->key, item->labels[item->value], item->values[item->value]);
+			// LOG_info("\tINIT %s (%s) TO %s (%s)", item->name, item->key, item->labels[item->value], item->values[item->value]);
 		}
 	}
 	// fflush(stdout);
 }
 static void OptionList_vars(const struct retro_variable* vars) {
-	LOG_info("OptionList_vars\n");
+	LOG_info("OptionList_vars");
 	int count;
 	for (count = 0; vars[count].key; count++)
 		;
@@ -1905,12 +1905,12 @@ static Option* OptionList_getOption(OptionList* list, const char* key) {
 }
 static char* OptionList_getOptionValue(OptionList* list, const char* key) {
 	Option* item = OptionList_getOption(list, key);
-	// if (item) LOG_info("\tGET %s (%s) = %s (%s)\n", item->name, item->key, item->labels[item->value], item->values[item->value]);
+	// if (item) LOG_info("\tGET %s (%s) = %s (%s)", item->name, item->key, item->labels[item->value], item->values[item->value]);
 
 	if (item)
 		return item->values[item->value];
 	else
-		LOG_warn("unknown option %s \n", key);
+		LOG_warn("unknown option %s ", key);
 	return NULL;
 }
 static void OptionList_setOptionRawValue(OptionList* list, const char* key, int value) {
@@ -1918,26 +1918,26 @@ static void OptionList_setOptionRawValue(OptionList* list, const char* key, int 
 	if (item) {
 		item->value = value;
 		list->changed = 1;
-		// LOG_info("\tRAW SET %s (%s) TO %s (%s)\n", item->name, item->key, item->labels[item->value], item->values[item->value]);
+		// LOG_info("\tRAW SET %s (%s) TO %s (%s)", item->name, item->key, item->labels[item->value], item->values[item->value]);
 		// if (list->on_set) list->on_set(list, key);
 
 		if (exactMatch((char*)core.tag, "GB") && containsString(item->key, "palette"))
 			Special_updatedDMGPalette(3); // from options
 	} else
-		LOG_info("unknown option %s \n", key);
+		LOG_info("unknown option %s ", key);
 }
 static void OptionList_setOptionValue(OptionList* list, const char* key, const char* value) {
 	Option* item = OptionList_getOption(list, key);
 	if (item) {
 		Option_setValue(item, value);
 		list->changed = 1;
-		// LOG_info("\tSET %s (%s) TO %s (%s)\n", item->name, item->key, item->labels[item->value], item->values[item->value]);
+		// LOG_info("\tSET %s (%s) TO %s (%s)", item->name, item->key, item->labels[item->value], item->values[item->value]);
 		// if (list->on_set) list->on_set(list, key);
 
 		if (exactMatch((char*)core.tag, "GB") && containsString(item->key, "palette"))
 			Special_updatedDMGPalette(2); // from core
 	} else
-		LOG_info("unknown option %s \n", key);
+		LOG_info("unknown option %s ", key);
 }
 // static void OptionList_setOptionVisibility(OptionList* list, const char* key, int visible) {
 // 	Option* item = OptionList_getOption(list, key);
@@ -1970,11 +1970,11 @@ static void Menu_loadState(void);
  */
 static int setFastForward(int enable) {
 	if (!fast_forward && enable && thread_video) {
-		// LOG_info("entered fast forward with threaded core...\n");
+		// LOG_info("entered fast forward with threaded core...");
 		was_threaded = 1;
 		toggle_thread = 1;
 	} else if (fast_forward && !enable && !thread_video && was_threaded) {
-		// LOG_info("exited fast forward with previously threaded core...\n");
+		// LOG_info("exited fast forward with previously threaded core...");
 		was_threaded = 0;
 		toggle_thread = 1;
 	}
@@ -2016,13 +2016,13 @@ static void input_poll_callback(void) {
 
 	if (PAD_justPressed(BTN_POWER)) {
 		if (thread_video) {
-			// LOG_info("pressed power with threaded core...\n");
+			// LOG_info("pressed power with threaded core...");
 			was_threaded = 1;
 			toggle_thread = 1;
 		}
 	} else if (PAD_justReleased(BTN_POWER)) {
 		if (!thread_video && was_threaded) {
-			// LOG_info("released power with previously threaded core before power off...\n");
+			// LOG_info("released power with previously threaded core before power off...");
 			was_threaded = 0;
 			toggle_thread = 1;
 		}
@@ -2143,7 +2143,7 @@ static void input_poll_callback(void) {
 		//  && !PWR_ignoreSettingInput(btn, show_setting)
 	}
 
-	// if (buttons) LOG_info("buttons: %i\n", buttons);
+	// if (buttons) LOG_info("buttons: %i", buttons);
 }
 static int16_t input_state_callback(unsigned port, unsigned device, unsigned index, unsigned id) {
 	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0) {
@@ -2172,7 +2172,7 @@ static void Input_init(const struct retro_input_descriptor* vars) {
 	if (input_initialized)
 		return;
 
-	LOG_info("Input_init\n");
+	LOG_info("Input_init");
 
 	config.controls = core_button_mapping[0].name ? core_button_mapping : default_button_mapping;
 
@@ -2207,7 +2207,7 @@ static void Input_init(const struct retro_input_descriptor* vars) {
 
 	for (int i = 0; default_button_mapping[i].name; i++) {
 		ButtonMapping* mapping = &default_button_mapping[i];
-		LOG_info("DEFAULT %s (%s): <%s>\n", core_button_names[mapping->retro], mapping->name,
+		LOG_info("DEFAULT %s (%s): <%s>", core_button_names[mapping->retro], mapping->name,
 		         (mapping->local == BTN_ID_NONE ? "NONE" : device_button_names[mapping->local]));
 		if (core_button_names[mapping->retro])
 			mapping->name = (char*)core_button_names[mapping->retro];
@@ -2224,7 +2224,7 @@ static void Input_init(const struct retro_input_descriptor* vars) {
 			mapping->ignore = 1;
 			continue;
 		}
-		LOG_info("%s: <%s> (%i:%i)\n", mapping->name,
+		LOG_info("%s: <%s> (%i:%i)", mapping->name,
 		         (mapping->local == BTN_ID_NONE ? "NONE" : device_button_names[mapping->local]),
 		         mapping->local, mapping->retro);
 	}
@@ -2239,11 +2239,11 @@ static bool set_rumble_state(unsigned port, enum retro_rumble_effect effect, uin
 	return 1;
 }
 static bool environment_callback(unsigned cmd, void* data) { // copied from picoarch initially
-	// LOG_info("environment_callback: %i\n", cmd);
+	// LOG_info("environment_callback: %i", cmd);
 
 	switch (cmd) {
 	// case RETRO_ENVIRONMENT_SET_ROTATION: { /* 1 */
-	// 	LOG_info("RETRO_ENVIRONMENT_SET_ROTATION %i\n", *(int *)data); // core requests frontend to handle rotation
+	// 	LOG_info("RETRO_ENVIRONMENT_SET_ROTATION %i", *(int *)data); // core requests frontend to handle rotation
 	// 	break;
 	// }
 	case RETRO_ENVIRONMENT_GET_OVERSCAN: { /* 2 */
@@ -2261,7 +2261,7 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	case RETRO_ENVIRONMENT_SET_MESSAGE: { /* 6 */
 		const struct retro_message* message = (const struct retro_message*)data;
 		if (message)
-			LOG_info("%s\n", message->msg);
+			LOG_info("%s", message->msg);
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL: { /* 8 */
@@ -2326,7 +2326,7 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	}
 	case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME: { /* 18 */
 		bool flag = *(bool*)data;
-		// LOG_info("%i: RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME: %i\n", cmd, flag);
+		// LOG_info("%i: RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME: %i", cmd, flag);
 		break;
 	}
 	case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE: { /* 17 */
@@ -2338,17 +2338,17 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK: { /* 21 */
-		// LOG_info("%i: RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK\n", cmd);
+		// LOG_info("%i: RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK", cmd);
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK: { /* 22 */
-		// LOG_info("%i: RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK\n", cmd);
+		// LOG_info("%i: RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK", cmd);
 		break;
 	}
 	case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: { /* 23 */
 		struct retro_rumble_interface* iface = (struct retro_rumble_interface*)data;
 
-		// LOG_info("Setup rumble interface.\n");
+		// LOG_info("Setup rumble interface.");
 		iface->set_rumble_state = set_rumble_state;
 		break;
 	}
@@ -2372,7 +2372,7 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: { /* 35 */
-		// LOG_info("RETRO_ENVIRONMENT_SET_CONTROLLER_INFO\n");
+		// LOG_info("RETRO_ENVIRONMENT_SET_CONTROLLER_INFO");
 		const struct retro_controller_info* infos = (const struct retro_controller_info*)data;
 		if (infos) {
 			// TODO: store to gamepad_values/gamepad_labels for gamepad_device
@@ -2469,29 +2469,29 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	// TODO: RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION 59
 	// TODO: used by mgba, (but only during frameskip?)
 	// case RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK: { /* 62 */
-	// 	LOG_info("RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK\n");
+	// 	LOG_info("RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK");
 	// 	const struct retro_audio_buffer_status_callback *cb = (const struct retro_audio_buffer_status_callback *)data;
 	// 	if (cb) {
-	// 		LOG_info("has audo_buffer_status callback\n");
+	// 		LOG_info("has audo_buffer_status callback");
 	// 		core.audio_buffer_status = cb->callback;
 	// 	} else {
-	// 		LOG_info("no audo_buffer_status callback\n");
+	// 		LOG_info("no audo_buffer_status callback");
 	// 		core.audio_buffer_status = NULL;
 	// 	}
 	// 	break;
 	// }
 	// TODO: used by mgba, (but only during frameskip?)
 	// case RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY: { /* 63 */
-	// 	LOG_info("RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY\n");
+	// 	LOG_info("RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY");
 	//
 	// 	const unsigned *latency_ms = (const unsigned *)data;
 	// 	if (latency_ms) {
 	// 		unsigned frames = *latency_ms * core.fps / 1000;
 	// 		if (frames < 30)
 	// 			// audio_buffer_size_override = frames;
-	// 			LOG_info("audio_buffer_size_override = %i (unused?)\n", frames);
+	// 			LOG_info("audio_buffer_size_override = %i (unused?)", frames);
 	// 		else
-	// 			LOG_info("Audio buffer change out of range (%d), ignored\n", frames);
+	// 			LOG_info("Audio buffer change out of range (%d), ignored", frames);
 	// 	}
 	// 	break;
 	// }
@@ -2537,7 +2537,7 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		// };
 
 	default:
-		// LOG_debug("Unsupported environment cmd: %u\n", cmd);
+		// LOG_debug("Unsupported environment cmd: %u", cmd);
 		return false;
 	}
 	return true;
@@ -2554,7 +2554,7 @@ static void hdmimon(void) {
 	if (has_hdmi != had_hdmi) {
 		had_hdmi = has_hdmi;
 
-		LOG_info("restarting after HDMI change...\n");
+		LOG_info("restarting after HDMI change...");
 		Menu_beforeSleep();
 		sleep(4);
 		show_menu = 0;
@@ -2964,7 +2964,7 @@ static void buffer_downsample(const void* data, unsigned width, unsigned height,
  * @note Clears screen when scaler changes
  */
 static void selectScaler(int src_w, int src_h, int src_p) {
-	LOG_info("selectScaler\n");
+	LOG_info("selectScaler");
 
 	if (downsample)
 		buffer_realloc(src_w, src_h, src_p);
@@ -3077,7 +3077,7 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 		} else {
 			double scale_f =
 			    MIN(((double)DEVICE_WIDTH) / aspect_w, ((double)DEVICE_HEIGHT) / aspect_h);
-			LOG_info("scale_f:%f\n", scale_f);
+			LOG_info("scale_f:%f", scale_f);
 
 			sprintf(scaler_name, "aspect fit");
 			dst_w = aspect_w * scale_f;
@@ -3163,7 +3163,7 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 
 	// TODO: need to sanity check scale and demands on the buffer
 
-	// LOG_info("aspect: %ix%i (%f)\n", aspect_w,aspect_h,core.aspect_ratio);
+	// LOG_info("aspect: %ix%i (%f)", aspect_w,aspect_h,core.aspect_ratio);
 
 	renderer.src_x = src_x;
 	renderer.src_y = src_y;
@@ -3179,10 +3179,10 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	renderer.aspect = (scaling == SCALE_NATIVE || scaling == SCALE_CROPPED)
 	                      ? 0
 	                      : (scaling == SCALE_FULLSCREEN ? -1 : core.aspect_ratio);
-	LOG_info("aspect: %f\n", renderer.aspect);
+	LOG_info("aspect: %f", renderer.aspect);
 	renderer.blit = GFX_getScaler(&renderer);
 
-	// LOG_info("coreAR:%0.3f fixedAR:%0.3f srcAR: %0.3f\nname:%s\nfit:%i scale:%i\nsrc_x:%i src_y:%i src_w:%i src_h:%i src_p:%i\ndst_x:%i dst_y:%i dst_w:%i dst_h:%i dst_p:%i\naspect_w:%i aspect_h:%i\n",
+	// LOG_info("coreAR:%0.3f fixedAR:%0.3f srcAR: %0.3f\nname:%s\nfit:%i scale:%i\nsrc_x:%i src_y:%i src_w:%i src_h:%i src_p:%i\ndst_x:%i dst_y:%i dst_w:%i dst_h:%i dst_p:%i\naspect_w:%i aspect_h:%i",
 	// 	core.aspect_ratio, ((double)DEVICE_WIDTH) / DEVICE_HEIGHT, ((double)src_w) / src_h,
 	// 	scaler_name,
 	// 	fit,scale,
@@ -3273,7 +3273,7 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 		renderer.src = (void*)data;
 	}
 	renderer.dst = screen->pixels;
-	// LOG_info("video_refresh_callback: %ix%i@%i %ix%i@%i\n",width,height,pitch,screen->w,screen->h,screen->pitch);
+	// LOG_info("video_refresh_callback: %ix%i@%i %ix%i@%i",width,height,pitch,screen->w,screen->h,screen->pitch);
 
 	GFX_blitRenderer(&renderer);
 
@@ -3397,11 +3397,11 @@ void Core_getName(char* in_name, char* out_name) {
  * @note Exits on failure (core is required to continue)
  */
 void Core_open(const char* core_path, const char* tag_name) {
-	LOG_info("Core_open\n");
+	LOG_info("Core_open");
 	core.handle = dlopen(core_path, RTLD_LAZY);
 
 	if (!core.handle)
-		LOG_error("%s\n", dlerror());
+		LOG_error("%s", dlerror());
 
 	core.init = dlsym(core.handle, "retro_init");
 	core.deinit = dlsym(core.handle, "retro_deinit");
@@ -3444,7 +3444,7 @@ void Core_open(const char* core_path, const char* tag_name) {
 
 	core.need_fullpath = info.need_fullpath;
 
-	LOG_info("core: %s version: %s tag: %s (valid_extensions: %s need_fullpath: %i)\n", core.name,
+	LOG_info("core: %s version: %s tag: %s (valid_extensions: %s need_fullpath: %i)", core.name,
 	         core.version, core.tag, info.valid_extensions, info.need_fullpath);
 
 	sprintf((char*)core.config_dir, USERDATA_PATH "/%s-%s", core.tag, core.name);
@@ -3464,17 +3464,17 @@ void Core_open(const char* core_path, const char* tag_name) {
 	set_input_state_callback(input_state_callback);
 }
 void Core_init(void) {
-	LOG_info("Core_init\n");
+	LOG_info("Core_init");
 	core.init();
 	core.initialized = 1;
 }
 void Core_load(void) {
-	LOG_info("Core_load\n");
+	LOG_info("Core_load");
 	struct retro_game_info game_info;
 	game_info.path = game.tmp_path[0] ? game.tmp_path : game.path;
 	game_info.data = game.data;
 	game_info.size = game.size;
-	LOG_info("game path: %s (%i)\n", game_info.path, game.size);
+	LOG_info("game path: %s (%i)", game_info.path, game.size);
 
 	core.load_game(&game_info);
 
@@ -3494,7 +3494,7 @@ void Core_load(void) {
 		a = (double)av_info.geometry.base_width / av_info.geometry.base_height;
 	core.aspect_ratio = a;
 
-	LOG_info("aspect_ratio: %f (%ix%i) fps: %f\n", a, av_info.geometry.base_width,
+	LOG_info("aspect_ratio: %f (%ix%i) fps: %f", a, av_info.geometry.base_width,
 	         av_info.geometry.base_height, core.fps);
 }
 void Core_reset(void) {
@@ -3625,7 +3625,7 @@ void Menu_quit(void) {
 	SDL_FreeSurface(menu.overlay);
 }
 void Menu_beforeSleep(void) {
-	// LOG_info("beforeSleep\n");
+	// LOG_info("beforeSleep");
 	SRAM_write();
 	RTC_write();
 	State_autosave();
@@ -3633,7 +3633,7 @@ void Menu_beforeSleep(void) {
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
 }
 void Menu_afterSleep(void) {
-	// LOG_info("beforeSleep\n");
+	// LOG_info("beforeSleep");
 	unlink(AUTO_RESUME_PATH);
 	setOverclock(overclock);
 }
@@ -3768,7 +3768,7 @@ static int OptionFrontend_openMenu(MenuList* list, int i) {
 static int OptionEmulator_optionChanged(MenuList* list, int i) {
 	MenuItem* item = &list->items[i];
 	Option* option = OptionList_getOption(&config.core, item->key);
-	LOG_info("%s (%s) changed from `%s` (%s) to `%s` (%s)\n", item->name, item->key,
+	LOG_info("%s (%s) changed from `%s` (%s) to `%s` (%s)", item->name, item->key,
 	         item->values[option->value], option->values[option->value], item->values[item->value],
 	         option->values[item->value]);
 	OptionList_setOptionRawValue(&config.core, item->key, item->value);
@@ -3842,7 +3842,7 @@ static int OptionEmulator_openMenu(MenuList* list, int i) {
 int OptionControls_bind(MenuList* list, int i) {
 	MenuItem* item = &list->items[i];
 	if (item->values != button_labels) {
-		// LOG_info("changed gamepad_type\n");
+		// LOG_info("changed gamepad_type");
 		return MENU_CALLBACK_NOP;
 	}
 
@@ -3905,7 +3905,7 @@ static MenuList OptionControls_menu = {
     .on_change = OptionControls_unbind,
     .items = NULL};
 static int OptionControls_openMenu(MenuList* list, int i) {
-	LOG_info("OptionControls_openMenu\n");
+	LOG_info("OptionControls_openMenu");
 
 	if (OptionControls_menu.items == NULL) {
 		// TODO: where do I free this?
@@ -3927,7 +3927,7 @@ static int OptionControls_openMenu(MenuList* list, int i) {
 			if (button->ignore)
 				continue;
 
-			LOG_info("\t%s (%i:%i)\n", button->name, button->local, button->retro);
+			LOG_info("\t%s (%i:%i)", button->name, button->local, button->retro);
 
 			MenuItem* item = &OptionControls_menu.items[k++];
 			item->id = j;
@@ -4505,7 +4505,7 @@ static int Menu_options(MenuList* list) {
 }
 
 static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
-	// LOG_info("Menu_scale src: %ix%i dst: %ix%i\n", src->w,src->h,dst->w,dst->h);
+	// LOG_info("Menu_scale src: %ix%i dst: %ix%i", src->w,src->h,dst->w,dst->h);
 
 	uint16_t* s = src->pixels;
 	uint16_t* d = dst->pixels;
@@ -4528,18 +4528,18 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 		scaling = SCALE_NATIVE;
 	}
 	if (scaling == SCALE_NATIVE) {
-		// LOG_info("native\n");
+		// LOG_info("native");
 
 		rx = renderer.dst_x;
 		ry = renderer.dst_y;
 		rw = renderer.src_w;
 		rh = renderer.src_h;
 		if (renderer.scale) {
-			// LOG_info("scale: %i\n", renderer.scale);
+			// LOG_info("scale: %i", renderer.scale);
 			rw *= renderer.scale;
 			rh *= renderer.scale;
 		} else {
-			// LOG_info("forced crop\n"); // eg. fc on nano, vb on smart
+			// LOG_info("forced crop"); // eg. fc on nano, vb on smart
 			rw -= renderer.src_x * 2;
 			rh -= renderer.src_y * 2;
 			sw = rw;
@@ -4547,14 +4547,14 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 		}
 
 		if (dw == DEVICE_WIDTH / 2) {
-			// LOG_info("halve\n");
+			// LOG_info("halve");
 			rx /= 2;
 			ry /= 2;
 			rw /= 2;
 			rh /= 2;
 		}
 	} else if (scaling == SCALE_CROPPED) {
-		// LOG_info("cropped\n");
+		// LOG_info("cropped");
 		sw -= renderer.src_x * 2;
 		sh -= renderer.src_y * 2;
 
@@ -4564,7 +4564,7 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 		rh = sh * renderer.scale;
 
 		if (dw == DEVICE_WIDTH / 2) {
-			// LOG_info("halve\n");
+			// LOG_info("halve");
 			rx /= 2;
 			ry /= 2;
 			rw /= 2;
@@ -4573,24 +4573,24 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 	}
 
 	if (scaling == SCALE_ASPECT || rw > dw || rh > dh) {
-		// LOG_info("aspect\n");
+		// LOG_info("aspect");
 		double fixed_aspect_ratio = ((double)DEVICE_WIDTH) / DEVICE_HEIGHT;
 		int core_aspect = core.aspect_ratio * 1000;
 		int fixed_aspect = fixed_aspect_ratio * 1000;
 
 		if (core_aspect > fixed_aspect) {
-			// LOG_info("letterbox\n");
+			// LOG_info("letterbox");
 			rw = dw;
 			rh = rw / core.aspect_ratio;
 			rh += rh % 2;
 		} else if (core_aspect < fixed_aspect) {
-			// LOG_info("pillarbox\n");
+			// LOG_info("pillarbox");
 			rh = dh;
 			rw = rh * core.aspect_ratio;
 			rw += rw % 2;
 			rw = (rw / 8) * 8; // probably necessary here since we're not scaling by an integer
 		} else {
-			// LOG_info("perfect match\n");
+			// LOG_info("perfect match");
 			rw = dw;
 			rh = dh;
 		}
@@ -4599,8 +4599,8 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 		ry = (dh - rh) / 2;
 	}
 
-	// LOG_info("Menu_scale (r): %i,%i %ix%i\n",rx,ry,rw,rh);
-	// LOG_info("offset: %i,%i\n", renderer.src_x, renderer.src_y);
+	// LOG_info("Menu_scale (r): %i,%i %ix%i",rx,ry,rw,rh);
+	// LOG_info("offset: %i,%i", renderer.src_x, renderer.src_y);
 
 	// dumb nearest neighbor scaling
 	int mx = (sw << 16) / rw;
@@ -4613,8 +4613,8 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 	int dr = ry * dp;
 	int cp = dp * FIXED_BPP;
 
-	// LOG_info("Menu_scale (s): %i,%i %ix%i\n",sx,sy,sw,sh);
-	// LOG_info("mx:%i my:%i sx>>16:%i sy>>16:%i\n",mx,my,((sx+mx) >> 16),((sy+my) >> 16));
+	// LOG_info("Menu_scale (s): %i,%i %ix%i",sx,sy,sw,sh);
+	// LOG_info("mx:%i my:%i sx>>16:%i sy>>16:%i",mx,my,((sx+mx) >> 16),((sy+my) >> 16));
 
 	for (int dy = 0; dy < rh; dy++) {
 		sx = ox;
@@ -4632,7 +4632,7 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 		dr += dp;
 	}
 
-	// LOG_info("successful\n");
+	// LOG_info("successful");
 }
 
 static void Menu_initState(void) {
@@ -4645,7 +4645,7 @@ static void Menu_initState(void) {
 	menu.preview_exists = 0;
 }
 static void Menu_updateState(void) {
-	// LOG_info("Menu_updateState\n");
+	// LOG_info("Menu_updateState");
 
 	int last_slot = state_slot;
 	state_slot = menu.slot;
@@ -4661,11 +4661,11 @@ static void Menu_updateState(void) {
 	menu.save_exists = exists(save_path);
 	menu.preview_exists = menu.save_exists && exists(menu.bmp_path);
 
-	// LOG_info("save_path: %s (%i)\n", save_path, menu.save_exists);
-	// LOG_info("bmp_path: %s txt_path: %s (%i)\n", menu.bmp_path, menu.txt_path, menu.preview_exists);
+	// LOG_info("save_path: %s (%i)", save_path, menu.save_exists);
+	// LOG_info("bmp_path: %s txt_path: %s (%i)", menu.bmp_path, menu.txt_path, menu.preview_exists);
 }
 static void Menu_saveState(void) {
-	// LOG_info("Menu_saveState\n");
+	// LOG_info("Menu_saveState");
 
 	Menu_updateState();
 
@@ -4681,7 +4681,7 @@ static void Menu_saveState(void) {
 	SDL_RWops* out = SDL_RWFromFile(menu.bmp_path, "wb");
 	SDL_SaveBMP_RW(bitmap, out, 1);
 
-	// LOG_info("%s %ix%i\n", menu.bmp_path, bitmap->w,bitmap->h);
+	// LOG_info("%s %ix%i", menu.bmp_path, bitmap->w,bitmap->h);
 
 	if (bitmap != menu.bitmap)
 		SDL_FreeSurface(bitmap);
@@ -4691,7 +4691,7 @@ static void Menu_saveState(void) {
 	State_write();
 }
 static void Menu_loadState(void) {
-	// LOG_info("Menu_loadState\n");
+	// LOG_info("Menu_loadState");
 
 	Menu_updateState();
 
@@ -4719,7 +4719,7 @@ static void Menu_loadState(void) {
 }
 
 static void getAlias(char* path, char* alias) {
-	// LOG_info("alias path: %s\n", path);
+	// LOG_info("alias path: %s", path);
 	char* tmp;
 	char map_path[256];
 	strcpy(map_path, path);
@@ -4727,12 +4727,12 @@ static void getAlias(char* path, char* alias) {
 	if (tmp) {
 		tmp += 1;
 		strcpy(tmp, "map.txt");
-		// LOG_info("map_path: %s\n", map_path);
+		// LOG_info("map_path: %s", map_path);
 	}
 	char* file_name = strrchr(path, '/');
 	if (file_name)
 		file_name += 1;
-	// LOG_info("file_name: %s\n", file_name);
+	// LOG_info("file_name: %s", file_name);
 
 	if (exists(map_path)) {
 		FILE* file = fopen(map_path, "r");
@@ -4789,7 +4789,7 @@ static void getAlias(char* path, char* alias) {
 static void Menu_loop(void) {
 	menu.bitmap = SDL_CreateRGBSurfaceFrom(renderer.src, renderer.true_w, renderer.true_h,
 	                                       FIXED_DEPTH, renderer.src_p, RGBA_MASK_565);
-	// LOG_info("Menu_loop:menu.bitmap %ix%i\n", menu.bitmap->w,menu.bitmap->h);
+	// LOG_info("Menu_loop:menu.bitmap %ix%i", menu.bitmap->w,menu.bitmap->h);
 
 	SDL_Surface* backing = SDL_CreateRGBSurface(SDL_SWSURFACE, DEVICE_WIDTH, DEVICE_HEIGHT,
 	                                            FIXED_DEPTH, RGBA_MASK_565);
@@ -5062,7 +5062,7 @@ static void Menu_loop(void) {
 					SDL_Surface* raw_preview =
 					    SDL_ConvertSurface(bmp, screen->format, SDL_SWSURFACE);
 
-					// LOG_info("raw_preview %ix%i\n", raw_preview->w,raw_preview->h);
+					// LOG_info("raw_preview %ix%i", raw_preview->w,raw_preview->h);
 
 					SDL_FillRect(preview, NULL, 0);
 					Menu_scale(raw_preview, preview);
@@ -5196,7 +5196,7 @@ static void trackFPS(void) {
 		cpu_ticks = 0;
 		fps_ticks = 0;
 
-		// LOG_info("fps: %f cpu: %f\n", fps_double, cpu_double);
+		// LOG_info("fps: %f cpu: %f", fps_double, cpu_double);
 	}
 }
 
@@ -5312,7 +5312,7 @@ static void* coreThread(void* arg) {
  * @note Exits early if game fails to load
  */
 int main(int argc, char* argv[]) {
-	LOG_info("MinArch\n");
+	LOG_info("MinArch");
 
 	setOverclock(overclock); // default to normal
 	// force a stack overflow to ensure asan is linked and actually working
@@ -5327,14 +5327,14 @@ int main(int argc, char* argv[]) {
 	strcpy(rom_path, argv[2]);
 	getEmuName(rom_path, tag_name);
 
-	LOG_info("rom_path: %s\n", rom_path);
+	LOG_info("rom_path: %s", rom_path);
 
 	screen = GFX_init(MODE_MENU);
 	PAD_init();
 	DEVICE_WIDTH = screen->w;
 	DEVICE_HEIGHT = screen->h;
 	DEVICE_PITCH = screen->pitch;
-	// LOG_info("DEVICE_SIZE: %ix%i (%i)\n", DEVICE_WIDTH,DEVICE_HEIGHT,DEVICE_PITCH);
+	// LOG_info("DEVICE_SIZE: %ix%i (%i)", DEVICE_WIDTH,DEVICE_HEIGHT,DEVICE_PITCH);
 
 	VIB_init();
 	PWR_init();
@@ -5423,12 +5423,12 @@ int main(int argc, char* argv[]) {
 		if (toggle_thread) {
 			toggle_thread = 0;
 			if (was_threaded && !thread_video) {
-				// LOG_info("was fast forwarding while previously threaded (%i) so re-enabling threading %i\n", thread_video, !thread_video);
+				// LOG_info("was fast forwarding while previously threaded (%i) so re-enabling threading %i", thread_video, !thread_video);
 				// revert to pre-fast_forward state before toggling
 				was_threaded = 0;
 				thread_video = !thread_video;
 			}
-			// LOG_info("toggling thread from %i to %i\n", thread_video, !thread_video);
+			// LOG_info("toggling thread from %i to %i", thread_video, !thread_video);
 			thread_video = !thread_video;
 			if (thread_video) {
 				// enable
@@ -5446,7 +5446,7 @@ int main(int argc, char* argv[]) {
 				GFX_flip(screen);
 			}
 		}
-		// LOG_info("frame duration: %ims\n", SDL_GetTicks()-frame_start);
+		// LOG_info("frame duration: %ims", SDL_GetTicks()-frame_start);
 
 		hdmimon();
 	}

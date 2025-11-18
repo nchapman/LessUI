@@ -23,6 +23,8 @@
 #include <linux/input.h>
 #include <pthread.h>
 
+#include "../../all/common/log.h"
+
 #include <msettings.h>
 
 #include <sys/types.h>

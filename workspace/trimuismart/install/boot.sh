@@ -28,7 +28,7 @@ if [ -f "$UPDATE_PATH" ]; then
 	
 	# the updated system finishes the install/update
 	if [ -f $SYSTEM_PATH/$PLATFORM/bin/install.sh ]; then
-		$SYSTEM_PATH/$PLATFORM/bin/install.sh # &> $SDCARD_PATH/log.txt
+		$SYSTEM_PATH/$PLATFORM/bin/install.sh # &> $SDCARD_PATH/log.txt> $SDCARD_PATH/install.log
 	fi
 fi
 

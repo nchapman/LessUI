@@ -10,26 +10,26 @@ UPDATE_PATH=${SDCARD_PATH}${UPDATE_FRAG}
 
 # is there an update available?
 if [ -f $UPDATE_PATH ]; then
-	echo "zip detected" >> $SDCARD_PATH/log.txt
+	echo "zip detected" >> $SDCARD_PATH/install.log
 	
 	if [ ! -d $SYSTEM_PATH ]; then
 		ACTION=installing
-		echo "install LessUI" >> $SDCARD_PATH/log.txt
+		echo "install LessUI" >> $SDCARD_PATH/install.log
 	else
 		ACTION=updating
-		echo "update LessUI" >> $SDCARD_PATH/log.txt
+		echo "update LessUI" >> $SDCARD_PATH/install.log
 	fi
 	
 	# show action
 	dd if=/usr/config/minui/$ACTION.bmp of=/dev/fb0 bs=1 skip=54
 	echo 0,0 > /sys/class/graphics/fb0/pan
 
-	unzip -o $UPDATE_PATH -d $SDCARD_PATH >> $SDCARD_PATH/log.txt
+	unzip -o $UPDATE_PATH -d $SDCARD_PATH >> $SDCARD_PATH/install.log
 	rm -f $UPDATE_PATH
 
 	# the updated system finishes the install/update
 	if [ -f $SYSTEM_PATH/bin/install.sh ]; then
-		$SYSTEM_PATH/bin/install.sh >> $SDCARD_PATH/log.txt
+		$SYSTEM_PATH/bin/install.sh >> $SDCARD_PATH/install.log
 	fi
 fi
 

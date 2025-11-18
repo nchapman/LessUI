@@ -56,7 +56,7 @@ EXEC_PATH="/tmp/minui_exec"
 NEXT_PATH="/tmp/next"
 touch "$EXEC_PATH"  && sync
 while [ -f $EXEC_PATH ]; do
-	minui.elf &> $LOGS_PATH/minui.txt
+	minui.elf &> $LOGS_PATH/minui.log
 	echo `date +'%F %T'` > "$DATETIME_PATH"
 	sync
 	

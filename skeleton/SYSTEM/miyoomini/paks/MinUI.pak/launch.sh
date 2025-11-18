@@ -88,16 +88,16 @@ lumon.elf & # adjust lcd luma and saturation
 if $IS_PLUS; then
 	CHARGING=`/customer/app/axp_test | awk -F'[,: {}]+' '{print $7}'`
 	if [ "$CHARGING" == "3" ]; then
-		batmon.elf # &> /mnt/SDCARD/batmon.txt
+		batmon.elf # &> /mnt/SDCARD/batmon.log
 	fi
 else
 	CHARGING=`cat /sys/devices/gpiochip0/gpio/gpio59/value`
 	if [ "$CHARGING" == "1" ]; then
-		batmon.elf # &> /mnt/SDCARD/batmon.txt
+		batmon.elf # &> /mnt/SDCARD/batmon.log
 	fi
 fi
 
-keymon.elf & # &> /mnt/SDCARD/keymon.txt &
+keymon.elf & # &> /mnt/SDCARD/keymon.log &
 
 #######################################
 
@@ -125,7 +125,7 @@ NEXT_PATH="/tmp/next"
 touch "$EXEC_PATH"  && sync
 while [ -f "$EXEC_PATH" ]; do
 	overclock.elf $CPU_SPEED_PERF
-	minui.elf &> $LOGS_PATH/minui.txt
+	minui.elf &> $LOGS_PATH/minui.log
 	
 	echo `date +'%F %T'` > "$DATETIME_PATH"
 	sync

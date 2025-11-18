@@ -35,7 +35,7 @@ CPU_PATH=/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
 CPU_SPEED_PERF=1800000
 echo $CPU_SPEED_PERF > $CPU_PATH
 
-keymon.elf & # &> $SDCARD_PATH/keymon.txt &
+keymon.elf & # &> $SDCARD_PATH/keymon.log &
 
 #######################################
 
@@ -52,7 +52,7 @@ EXEC_PATH="/tmp/minui_exec"
 NEXT_PATH="/tmp/next"
 touch "$EXEC_PATH"  && sync
 while [ -f $EXEC_PATH ]; do
-	minui.elf &> $LOGS_PATH/minui.txt
+	minui.elf &> $LOGS_PATH/minui.log
 	[ -f $EXEC_PATH ] && echo $CPU_SPEED_PERF > $CPU_PATH
 	echo `date +'%F %T'` > "$DATETIME_PATH"
 	sync

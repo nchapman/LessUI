@@ -13,7 +13,7 @@ CC = $(CROSS_COMPILE)gcc
 FLAGS	= -Os -lmsettings -lpthread -lrt -ldl -Wl,--gc-sections -s
 
 all: $(PREFIX)/include/msettings.h
-	$(CC) $(TARGET).c -o $(PRODUCT) $(FLAGS)
+	$(CC) $(TARGET).c ../../all/common/log.c -o $(PRODUCT) $(FLAGS)
 clean:
 	rm -rf $(PRODUCT)
 

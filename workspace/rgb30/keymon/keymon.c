@@ -30,6 +30,8 @@
 #include <linux/input.h>
 #include <pthread.h>
 
+#include "../../all/common/log.h"
+
 #include <msettings.h>
 
 // Input event values from linux/input.h
