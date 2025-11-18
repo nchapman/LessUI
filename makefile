@@ -39,7 +39,8 @@ BUILD_HASH:=$(shell git rev-parse --short HEAD)
 RELEASE_TIME:=$(shell TZ=GMT date +%Y%m%d)
 RELEASE_BETA=
 RELEASE_BASE=LessUI-$(RELEASE_TIME)$(RELEASE_BETA)
-RELEASE_DOT:=$(shell find -E ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base\.zip" | wc -l | sed 's/ //g')
+RELEASE_COUNT:=$(shell find -E ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base\.zip" | wc -l | sed 's/ //g')
+RELEASE_DOT:=$(shell echo $$(($(RELEASE_COUNT) + 1)))
 RELEASE_NAME=$(RELEASE_BASE)-$(RELEASE_DOT)
 
 ###########################################################
