@@ -144,7 +144,7 @@ clean:
 setup: name
 	# ----------------------------------------------------
 	# Make sure we're running in an interactive terminal (not piped/redirected)
-	# tty -s  # TEMP: Disabled for automated builds
+	# tty -s  # Disabled: automated builds require non-interactive execution
 
 	# Create fresh build directory
 	rm -rf ./build

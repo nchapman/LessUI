@@ -135,7 +135,7 @@ generate_pak() {
     # Determine if this is a bundled core (EXTRAS only)
     local cores_path_override=""
     if [ "$output_base" = "EXTRAS" ] && is_bundled_core "$cores_json_type" "$core"; then
-        # shellcheck disable=SC2016
+        # shellcheck disable=SC2016 -- we want the literal string with unexpanded variable syntax for template substitution
         cores_path_override='CORES_PATH=$(dirname "$0")'
     fi
 
