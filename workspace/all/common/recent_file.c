@@ -7,7 +7,9 @@
 #define _POSIX_C_SOURCE 200809L // Required for strdup()
 
 #include "recent_file.h"
+#include "log.h"
 #include "utils.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,9 +32,18 @@ Recent_Entry** Recent_parse(char* recent_path, const char* sdcard_path, int* ent
 
 	// Allocate space for up to 50 recents
 	Recent_Entry** entries = malloc(sizeof(Recent_Entry*) * 50);
+	if (!entries) {
+		LOG_error("Failed to allocate memory for recent entries");
+		return NULL;
+	}
 
 	FILE* file = fopen(recent_path, "r");
-	if (file) {
+	if (!file) {
+		LOG_info("No recent games file at %s", recent_path);
+		return entries;
+	}
+
+	{
 		char line[256];
 		while (fgets(line, 256, file) != NULL && *entry_count < 50) {
 			normalizeNewline(line);
@@ -56,20 +67,24 @@ Recent_Entry** Recent_parse(char* recent_path, const char* sdcard_path, int* ent
 			// Only include ROMs that exist
 			if (exists(sd_path)) {
 				Recent_Entry* entry = malloc(sizeof(Recent_Entry));
-				if (!entry)
-					continue; // Skip this entry if allocation fails
+				if (!entry) {
+					LOG_warn("Failed to allocate memory for recent entry");
+					continue;
+				}
 
 				entry->path = strdup(path); // Store relative path
 				if (!entry->path) {
+					LOG_warn("Failed to duplicate path string: %s", path);
 					free(entry);
-					continue; // Skip this entry if strdup fails
+					continue;
 				}
 
 				entry->alias = alias ? strdup(alias) : NULL;
 				if (alias && !entry->alias) {
+					LOG_warn("Failed to duplicate alias string: %s", alias);
 					free(entry->path);
 					free(entry);
-					continue; // Skip this entry if strdup fails
+					continue;
 				}
 
 				entries[*entry_count] = entry;
@@ -88,6 +103,7 @@ Recent_Entry** Recent_parse(char* recent_path, const char* sdcard_path, int* ent
 int Recent_save(char* recent_path, Recent_Entry** entries, int count) {
 	FILE* file = fopen(recent_path, "w");
 	if (!file) {
+		LOG_errno("Failed to save recent games to %s", recent_path);
 		return 0;
 	}
 

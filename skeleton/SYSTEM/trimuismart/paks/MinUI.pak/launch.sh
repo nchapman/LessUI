@@ -28,6 +28,12 @@ mkdir -p "$USERDATA_PATH"
 mkdir -p "$LOGS_PATH"
 mkdir -p "$SHARED_USERDATA_PATH/.minui"
 
+# Source logging library with rotation (if available)
+if [ -f "$SDCARD_PATH/.system/common/log.sh" ]; then
+	. "$SDCARD_PATH/.system/common/log.sh"
+	log_init "$LOGS_PATH/minui.log"
+fi
+
 #######################################
 
 echo A,B,X,Y,L,R > /sys/module/gpio_keys_polled/parameters/button_config
@@ -75,7 +81,7 @@ EXEC_PATH="/tmp/minui_exec"
 NEXT_PATH="/tmp/next"
 touch "$EXEC_PATH"  && sync
 while [ -f $EXEC_PATH ]; do
-	minui.elf &> $LOGS_PATH/minui.txt
+	minui.elf &> $LOGS_PATH/minui.log
 	echo $CPU_SPEED_PERF > $CPU_PATH
 	echo `date +'%F %T'` > "$DATETIME_PATH"
 	sync

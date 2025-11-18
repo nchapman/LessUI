@@ -11,6 +11,6 @@ CFLAGS	= -Os -lmsettings -lrt -ldl -Wl,--gc-sections -s
 CFLAGS  += -I. -I../../all/common -I../platform/ -DPLATFORM=\"$(UNION_PLATFORM)\"
 
 all:
-	$(CC) $(TARGET).c -o $(TARGET).elf $(CFLAGS)
+	$(CC) $(TARGET).c ../../all/common/log.c -o $(TARGET).elf $(CFLAGS)
 clean:
 	rm -rf $(TARGET).elf

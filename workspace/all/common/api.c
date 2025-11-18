@@ -44,49 +44,6 @@
 #include "utils.h"
 
 ///////////////////////////////
-// Logging
-///////////////////////////////
-
-/**
- * Logs a message at the specified level to stdout/stderr.
- *
- * Supports DEBUG, INFO, WARN, and ERROR levels. Debug messages
- * are only logged when DEBUG is defined at compile time.
- *
- * @param level Log level (LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR)
- * @param fmt Printf-style format string
- * @param ... Variable arguments for format string
- *
- * @note Always flushes stdout to ensure messages appear immediately
- */
-void LOG_note(int level, const char* fmt, ...) {
-	char buf[1024] = {0};
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, args);
-	va_end(args);
-	switch (level) {
-#ifdef DEBUG
-	case LOG_DEBUG:
-		printf("[DEBUG] %s", buf);
-		break;
-#endif
-	case LOG_INFO:
-		printf("[INFO] %s", buf);
-		break;
-	case LOG_WARN:
-		fprintf(stderr, "[WARN] %s", buf);
-		break;
-	case LOG_ERROR:
-		fprintf(stderr, "[ERROR] %s", buf);
-		break;
-	default:
-		break;
-	}
-	fflush(stdout);
-}
-
-///////////////////////////////
 // Graphics - Core initialization and state
 ///////////////////////////////
 
@@ -1387,11 +1344,11 @@ void SND_init(double sample_rate, double frame_rate) { // plat_sound_init
 	SDL_InitSubSystem(SDL_INIT_AUDIO);
 
 #if defined(USE_SDL2)
-	LOG_info("Available audio drivers:\n");
+	LOG_debug("Available audio drivers:\n");
 	for (int i = 0; i < SDL_GetNumAudioDrivers(); i++) {
-		LOG_info("- %s\n", SDL_GetAudioDriver(i));
+		LOG_debug("- %s\n", SDL_GetAudioDriver(i));
 	}
-	LOG_info("Current audio driver: %s\n", SDL_GetCurrentAudioDriver());
+	LOG_debug("Current audio driver: %s\n", SDL_GetCurrentAudioDriver());
 #endif
 
 	memset(&snd, 0, sizeof(struct SND_Context));
@@ -1407,7 +1364,7 @@ void SND_init(double sample_rate, double frame_rate) { // plat_sound_init
 	spec_in.callback = SND_audioCallback;
 
 	if (SDL_OpenAudio(&spec_in, &spec_out) < 0)
-		LOG_info("SDL_OpenAudio error: %s\n", SDL_GetError());
+		LOG_error("SDL_OpenAudio error: %s", SDL_GetError());
 
 	snd.buffer_seconds = 5;
 	snd.sample_rate_in = sample_rate;

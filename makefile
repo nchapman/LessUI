@@ -45,6 +45,14 @@ RELEASE_NAME=$(RELEASE_BASE)-$(RELEASE_DOT)
 ###########################################################
 # Build configuration
 
+# Logging configuration (applies to all components)
+# Options:
+#   -DENABLE_INFO_LOGS              INFO + WARN + ERROR (recommended for production)
+#   -DENABLE_INFO_LOGS -DENABLE_DEBUG_LOGS   All logs (development/troubleshooting)
+#   (none)                          WARN + ERROR only (minimal logging)
+LOG_FLAGS = -DENABLE_INFO_LOGS -DENABLE_DEBUG_LOGS
+export LOG_FLAGS
+
 # Pre-built cores from minarch-cores repository (nightly builds)
 MINARCH_CORES_VERSION ?= 20251117
 CORES_BASE = https://github.com/nchapman/minarch-cores/releases/download/$(MINARCH_CORES_VERSION)
@@ -196,6 +204,10 @@ done:
 
 # Platform-specific packaging for Miyoo/Trimui family
 special:
+	# Copy shared install/update functions to BOOT/common
+	mkdir -p ./build/BOOT/common/install
+	cp ./skeleton/SYSTEM/common/log.sh ./build/BOOT/common/install/
+	cp ./skeleton/SYSTEM/common/update-functions.sh ./build/BOOT/common/install/
 	# setup miyoomini/trimui/magicx family .tmp_update in BOOT
 	mv ./build/BOOT/common ./build/BOOT/.tmp_update
 	mv ./build/BOOT/miyoo ./build/BASE/

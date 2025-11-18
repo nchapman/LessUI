@@ -9,7 +9,9 @@
 #define _GNU_SOURCE // Required for strcasestr on glibc systems
 #include "utils.h"
 #include "defines.h"
+#include "log.h"
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -238,7 +240,7 @@ void touch(char* path) {
 /**
  * Writes a string to a file, overwriting existing content.
  *
- * Creates the file if it doesn't exist. Silently fails if
+ * Creates the file if it doesn't exist. Logs warning if
  * the file cannot be opened (e.g., permissions, disk full).
  *
  * @param path Path to file
@@ -246,10 +248,12 @@ void touch(char* path) {
  */
 void putFile(const char* path, const char* contents) {
 	FILE* file = fopen(path, "w");
-	if (file) {
-		fputs(contents, file);
-		fclose(file);
+	if (!file) {
+		LOG_errno_warn("Failed to write file %s", path);
+		return;
 	}
+	fputs(contents, file);
+	fclose(file);
 }
 
 /**
@@ -266,16 +270,19 @@ void putFile(const char* path, const char* contents) {
  */
 void getFile(const char* path, char* buffer, size_t buffer_size) {
 	FILE* file = fopen(path, "r");
-	if (file) {
-		fseek(file, 0L, SEEK_END);
-		size_t size = ftell(file);
-		if (size > buffer_size - 1)
-			size = buffer_size - 1;
-		rewind(file);
-		fread(buffer, sizeof(char), size, file);
-		fclose(file);
-		buffer[size] = '\0';
+	if (!file) {
+		LOG_debug("Could not read file %s: %s", path, strerror(errno));
+		return;
 	}
+
+	fseek(file, 0L, SEEK_END);
+	size_t size = ftell(file);
+	if (size > buffer_size - 1)
+		size = buffer_size - 1;
+	rewind(file);
+	fread(buffer, sizeof(char), size, file);
+	fclose(file);
+	buffer[size] = '\0';
 }
 
 /**
@@ -292,17 +299,25 @@ void getFile(const char* path, char* buffer, size_t buffer_size) {
 char* allocFile(const char* path) {
 	char* contents = NULL;
 	FILE* file = fopen(path, "r");
-	if (file) {
-		fseek(file, 0L, SEEK_END);
-		size_t size = ftell(file);
-		contents = calloc(size + 1, sizeof(char));
-		if (contents) {
-			fseek(file, 0L, SEEK_SET);
-			fread(contents, sizeof(char), size, file);
-			contents[size] = '\0';
-		}
-		fclose(file);
+	if (!file) {
+		LOG_errno("Failed to open file %s", path);
+		return NULL;
 	}
+
+	fseek(file, 0L, SEEK_END);
+	size_t size = ftell(file);
+	contents = calloc(size + 1, sizeof(char));
+	if (!contents) {
+		LOG_error("Failed to allocate %zu bytes for file %s", size + 1, path);
+		fclose(file);
+		return NULL;
+	}
+
+	fseek(file, 0L, SEEK_SET);
+	fread(contents, sizeof(char), size, file);
+	contents[size] = '\0';
+	fclose(file);
+
 	return contents;
 }
 
@@ -318,10 +333,12 @@ char* allocFile(const char* path) {
 int getInt(const char* path) {
 	int i = 0;
 	FILE* file = fopen(path, "r");
-	if (file != NULL) {
-		fscanf(file, "%i", &i);
-		fclose(file);
+	if (!file) {
+		LOG_debug("Could not read integer from %s: %s", path, strerror(errno));
+		return 0;
 	}
+	fscanf(file, "%i", &i);
+	fclose(file);
 	return i;
 }
 

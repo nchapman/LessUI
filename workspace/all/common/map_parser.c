@@ -5,7 +5,9 @@
  */
 
 #include "map_parser.h"
+#include "log.h"
 #include "utils.h"
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -39,7 +41,12 @@ char* Map_getAlias(char* path, char* alias) {
 	// Read map.txt if it exists
 	if (exists(map_path)) {
 		FILE* file = fopen(map_path, "r");
-		if (file) {
+		if (!file) {
+			LOG_debug("Could not open map file %s: %s", map_path, strerror(errno));
+			return alias;
+		}
+
+		{
 			char line[256];
 			while (fgets(line, 256, file) != NULL) {
 				normalizeNewline(line);

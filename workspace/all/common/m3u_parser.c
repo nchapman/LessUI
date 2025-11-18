@@ -7,7 +7,9 @@
 #define _POSIX_C_SOURCE 200809L // Required for strdup()
 
 #include "m3u_parser.h"
+#include "log.h"
 #include "utils.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +38,12 @@ int M3U_getFirstDisc(char* m3u_path, char* disc_path) {
 
 	// Open and parse M3U file
 	FILE* file = fopen(m3u_path, "r");
-	if (file) {
+	if (!file) {
+		LOG_errno("Failed to open M3U file %s", m3u_path);
+		return 0;
+	}
+
+	{
 		char line[256];
 		while (fgets(line, 256, file) != NULL) {
 			normalizeNewline(line);
@@ -72,6 +79,10 @@ M3U_Disc** M3U_getAllDiscs(char* m3u_path, int* disc_count) {
 
 	// Allocate space for up to 10 discs
 	M3U_Disc** discs = malloc(sizeof(M3U_Disc*) * 10);
+	if (!discs) {
+		LOG_error("Failed to allocate memory for M3U discs");
+		return NULL;
+	}
 
 	// Extract base directory from M3U path
 	char base_path[256];
@@ -84,7 +95,12 @@ M3U_Disc** M3U_getAllDiscs(char* m3u_path, int* disc_count) {
 
 	// Read M3U file
 	FILE* file = fopen(m3u_path, "r");
-	if (file) {
+	if (!file) {
+		LOG_errno("Failed to open M3U file %s", m3u_path);
+		return discs;
+	}
+
+	{
 		char line[256];
 		int disc_num = 0;
 
@@ -103,22 +119,26 @@ M3U_Disc** M3U_getAllDiscs(char* m3u_path, int* disc_count) {
 				disc_num++;
 
 				M3U_Disc* disc = malloc(sizeof(M3U_Disc));
-				if (!disc)
-					continue; // Skip this disc if allocation fails
+				if (!disc) {
+					LOG_warn("Failed to allocate memory for M3U disc");
+					continue;
+				}
 
 				disc->path = strdup(disc_path);
 				if (!disc->path) {
+					LOG_warn("Failed to duplicate disc path: %s", disc_path);
 					free(disc);
-					continue; // Skip this disc if strdup fails
+					continue;
 				}
 
 				char name[16];
 				sprintf(name, "Disc %i", disc_num);
 				disc->name = strdup(name);
 				if (!disc->name) {
+					LOG_warn("Failed to duplicate disc name: %s", name);
 					free(disc->path);
 					free(disc);
-					continue; // Skip this disc if strdup fails
+					continue;
 				}
 
 				disc->disc_number = disc_num;

@@ -35,6 +35,8 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 
+#include "../../all/common/log.h"
+
 #include "defines.h"
 
 // Input event values from linux/input.h

@@ -30,10 +30,12 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <msettings.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -702,18 +704,22 @@ static int restore_end = 0;
  */
 static void saveRecents(void) {
 	FILE* file = fopen(RECENT_PATH, "w");
-	if (file) {
-		for (int i = 0; i < recents->count; i++) {
-			Recent* recent = recents->items[i];
-			fputs(recent->path, file);
-			if (recent->alias) {
-				fputs("\t", file);
-				fputs(recent->alias, file);
-			}
-			putc('\n', file);
-		}
-		fclose(file);
+	if (!file) {
+		LOG_errno("Failed to save recent games to %s", RECENT_PATH);
+		return;
 	}
+
+	for (int i = 0; i < recents->count; i++) {
+		Recent* recent = recents->items[i];
+		fputs(recent->path, file);
+		if (recent->alias) {
+			fputs("\t", file);
+			fputs(recent->alias, file);
+		}
+		putc('\n', file);
+	}
+	fclose(file);
+	LOG_info("Saved %d recent games", recents->count);
 }
 
 /**
@@ -849,7 +855,7 @@ static int hasM3u(char* rom_path, char* m3u_path) {
  * @return 1 if any playable recents exist, 0 otherwise
  */
 static int hasRecents(void) {
-	LOG_info("hasRecents %s\n", RECENT_PATH);
+	LOG_debug("hasRecents %s", RECENT_PATH);
 	int has = 0;
 
 	// Track parent directories to avoid duplicate multi-disc entries
@@ -886,7 +892,7 @@ static int hasRecents(void) {
 			if (strlen(line) == 0)
 				continue; // skip empty lines
 
-			// LOG_info("line: %s\n", line);
+			// LOG_info("line: %s", line);
 
 			char* path = line;
 			char* alias = NULL;
@@ -924,7 +930,7 @@ static int hasRecents(void) {
 							Array_push(parent_paths, parent_copy);
 					}
 
-					// LOG_info("path:%s alias:%s\n", path, alias);
+					// LOG_info("path:%s alias:%s", path, alias);
 
 					Recent* recent = Recent_new(path, alias);
 					if (recent) {
@@ -1411,7 +1417,7 @@ static Array* getEntries(char* path) {
  * @param cmd Shell command to execute (must be properly quoted)
  */
 static void queueNext(char* cmd) {
-	LOG_info("cmd: %s\n", cmd);
+	LOG_info("cmd: %s", cmd);
 	putFile("/tmp/next", cmd);
 	quit = 1;
 }
@@ -1618,7 +1624,7 @@ static void openPak(char* path) {
  * @param last Path to save for state restoration (may differ from path)
  */
 static void openRom(char* path, char* last) {
-	LOG_info("openRom(%s,%s)\n", path, last);
+	LOG_info("openRom(%s,%s)", path, last);
 
 	char sd_path[256];
 	strcpy(sd_path, path);
@@ -1974,24 +1980,24 @@ int main(int argc, char* argv[]) {
 
 	simple_mode = exists(SIMPLE_MODE_PATH);
 
-	LOG_info("MinUI\n");
+	LOG_info("Starting MinUI on %s", PLATFORM);
 	InitSettings();
 
 	SDL_Surface* screen = GFX_init(MODE_MAIN);
-	// LOG_info("- graphics init: %lu\n", SDL_GetTicks() - main_begin);
+	// LOG_info("- graphics init: %lu", SDL_GetTicks() - main_begin);
 
 	PAD_init();
-	// LOG_info("- input init: %lu\n", SDL_GetTicks() - main_begin);
+	// LOG_info("- input init: %lu", SDL_GetTicks() - main_begin);
 
 	PWR_init();
 	if (!HAS_POWER_BUTTON && !simple_mode)
 		PWR_disableSleep();
-	// LOG_info("- power init: %lu\n", SDL_GetTicks() - main_begin);
+	// LOG_info("- power init: %lu", SDL_GetTicks() - main_begin);
 
 	SDL_Surface* version = NULL;
 
 	Menu_init();
-	// LOG_info("- menu init: %lu\n", SDL_GetTicks() - main_begin);
+	// LOG_info("- menu init: %lu", SDL_GetTicks() - main_begin);
 
 	// Reduce CPU speed for menu browsing (saves power and heat)
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
@@ -2003,7 +2009,7 @@ int main(int argc, char* argv[]) {
 	int show_setting = 0; // 1=brightness, 2=volume overlay
 	int was_online = PLAT_isOnline();
 
-	// LOG_info("- loop start: %lu\n", SDL_GetTicks() - main_begin);
+	// LOG_info("- loop start: %lu", SDL_GetTicks() - main_begin);
 	while (!quit) {
 		GFX_startFrame();
 		unsigned long now = SDL_GetTicks();
@@ -2184,7 +2190,7 @@ int main(int argc, char* argv[]) {
 				tmp[0] = '\0';
 
 				sprintf(res_path, "%s/.res/%s.png", res_root, res_name);
-				LOG_info("res_path: %s\n", res_path);
+				LOG_debug("res_path: %s", res_path);
 				if (exists(res_path)) {
 					had_thumb = 1;
 					SDL_Surface* thumb = IMG_Load(res_path);
@@ -2375,7 +2381,7 @@ int main(int argc, char* argv[]) {
 
 		// if (!first_draw) {
 		// 	first_draw = SDL_GetTicks();
-		// 	LOG_info("- first draw: %lu\n", first_draw - main_begin);
+		// 	LOG_info("- first draw: %lu", first_draw - main_begin);
 		// }
 
 		// HDMI hotplug detection
@@ -2389,7 +2395,7 @@ int main(int argc, char* argv[]) {
 			had_hdmi = has_hdmi;
 
 			Entry* entry = top->entries->items[top->selected];
-			LOG_info("restarting after HDMI change... (%s)\n", entry->path);
+			LOG_info("restarting after HDMI change... (%s)", entry->path);
 			saveLast(entry->path);
 			sleep(4); // Brief pause for HDMI to stabilize
 			quit = 1;

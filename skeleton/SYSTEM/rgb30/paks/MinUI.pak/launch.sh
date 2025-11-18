@@ -35,15 +35,22 @@ echo $CPU_SPEED_PERF > $CPU_PATH
 
 #######################################
 
-keymon.elf & # &> $SDCARD_PATH/keymon.txt &
+keymon.elf & # &> $SDCARD_PATH/keymon.log &
 
 #######################################
 
 mkdir -p "$LOGS_PATH"
 mkdir -p "$SHARED_USERDATA_PATH/.minui"
+
+# Source logging library with rotation (if available)
+if [ -f "$SDCARD_PATH/.system/common/log.sh" ]; then
+	. "$SDCARD_PATH/.system/common/log.sh"
+	log_init "$LOGS_PATH/minui.log"
+fi
+
 AUTO_PATH=$USERDATA_PATH/auto.sh
 if [ -f "$AUTO_PATH" ]; then
-	"$AUTO_PATH" # &> $LOGS_PATH/auto.txt
+	"$AUTO_PATH" # &> $LOGS_PATH/auto.log
 fi
 
 cd $(dirname "$0")
@@ -55,7 +62,7 @@ NEXT_PATH="/tmp/next"
 touch "$EXEC_PATH" && sync
 while [ -f "$EXEC_PATH" ]; do
 	echo $CPU_SPEED_PERF > $CPU_PATH
-	minui.elf &> $LOGS_PATH/minui.txt
+	minui.elf &> $LOGS_PATH/minui.log
 	echo `date +'%F %T'` > "$DATETIME_PATH"
 	sync
 	

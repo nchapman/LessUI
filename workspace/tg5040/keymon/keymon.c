@@ -29,6 +29,8 @@
 #include <dirent.h>
 #include <linux/input.h>
 #include <pthread.h>
+
+#include "../../all/common/log.h"
 #include <signal.h>
 
 #include <msettings.h>

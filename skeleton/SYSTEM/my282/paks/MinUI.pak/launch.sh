@@ -37,15 +37,22 @@ done &
 
 #######################################
 
-keymon.elf & #> $LOGS_PATH/keymon.txt 2>&1 &
+keymon.elf & #> $LOGS_PATH/keymon.log 2>&1 &
 
 #######################################
 
 mkdir -p "$LOGS_PATH"
 mkdir -p "$SHARED_USERDATA_PATH/.minui"
+
+# Source logging library with rotation (if available)
+if [ -f "$SDCARD_PATH/.system/common/log.sh" ]; then
+	. "$SDCARD_PATH/.system/common/log.sh"
+	log_init "$LOGS_PATH/minui.log"
+fi
+
 AUTO_PATH="$USERDATA_PATH/auto.sh"
 if [ -f "$AUTO_PATH" ]; then
-	"$AUTO_PATH" # > $LOGS_PATH/auto.txt 2>&1
+	"$AUTO_PATH" # > $LOGS_PATH/auto.log 2>&1
 fi
 
 cd $(dirname "$0")
@@ -56,7 +63,7 @@ EXEC_PATH="/tmp/minui_exec"
 NEXT_PATH="/tmp/next"
 touch "$EXEC_PATH" && sync
 while [ -f "$EXEC_PATH" ]; do
-	minui.elf > $LOGS_PATH/minui.txt 2>&1
+	minui.elf > $LOGS_PATH/minui.log 2>&1
 	reclock
 	echo `date +'%F %T'` > "$DATETIME_PATH"
 	sync
