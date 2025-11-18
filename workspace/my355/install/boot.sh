@@ -10,12 +10,8 @@ UPDATE_PATH="$SDCARD_PATH/LessUI.zip"
 SYSTEM_PATH="$SDCARD_PATH/.system"
 LOG_FILE="$SDCARD_PATH/lessui-install.log"
 
-# Embedded logging (same format as log.sh)
-log_write() {
-	echo "[$1] $2" >> "$LOG_FILE"
-}
-log_info() { log_write "INFO" "$*"; }
-log_error() { log_write "ERROR" "$*"; }
+# Source shared update functions
+. "$(dirname "$0")/install/update-functions.sh"
 
 CPU_PATH=/sys/devices/system/cpu/cpufreq/policy0/scaling_governor
 echo performance > "$CPU_PATH"
@@ -33,26 +29,12 @@ if [ -f "$UPDATE_PATH" ]; then
 	fi
 
 	log_info "Starting LessUI $ACTION..."
-	mv $SDCARD_PATH/.tmp_update $SDCARD_PATH/.tmp_update-old
-	if unzip -o "$UPDATE_PATH" -d "$SDCARD_PATH" >> "$LOG_FILE" 2>&1; then
-		log_info "Unzip complete"
-	else
-		EXIT_CODE=$?
-		log_error "Unzip failed with exit code $EXIT_CODE"
-	fi
-	rm -f "$UPDATE_PATH"
-	rm -rf $SDCARD_PATH/.tmp_update-old
 
-	# the updated system finishes the install/update
-	if [ -f $SYSTEM_PATH/$PLATFORM/bin/install.sh ]; then
-		log_info "Running install.sh..."
-		if $SYSTEM_PATH/$PLATFORM/bin/install.sh >> "$LOG_FILE" 2>&1; then
-			log_info "Installation complete"
-		else
-			EXIT_CODE=$?
-			log_error "install.sh failed with exit code $EXIT_CODE"
-		fi
-	fi
+	# Perform atomic update with automatic rollback
+	atomic_system_update "$UPDATE_PATH" "$SDCARD_PATH" "$SYSTEM_PATH" "$LOG_FILE"
+
+	# Run platform-specific install script
+	run_platform_install "$SYSTEM_PATH/$PLATFORM/bin/install.sh" "$LOG_FILE"
 fi
 
 # or launch (and keep launched)

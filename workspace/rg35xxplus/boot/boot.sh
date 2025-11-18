@@ -4,7 +4,10 @@ TF1_PATH=/mnt/mmc # TF1/NO NAME partition
 TF2_PATH=/mnt/sdcard # TF2
 LOG_FILE="$TF1_PATH/lessui-install.log"
 
-# Embedded logging (same format as log.sh)
+# Embedded logging (simplified for early boot environment)
+# NOTE: Inlined because this script runs from internal storage during early boot,
+# before SD card is mounted and .system is accessible. Cannot source shared log.sh.
+# Keep format in sync with skeleton/SYSTEM/common/log.sh
 log_write() {
 	echo "[$1] $2" >> "$LOG_FILE"
 }

@@ -2,6 +2,11 @@
 #
 # log.sh - LessUI Shell Script Logging Library
 #
+# SOURCE LOCATION: skeleton/SYSTEM/common/log.sh
+# BUILD DESTINATIONS (copied during make):
+#   1. .system/common/log.sh (runtime - sourced by launch.sh)
+#   2. .tmp_update/install/log.sh (update time - sourced by boot.sh)
+#
 # Provides consistent, timestamped logging for boot scripts, install scripts,
 # and launch scripts across all platforms.
 #
