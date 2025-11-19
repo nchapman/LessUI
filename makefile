@@ -121,17 +121,27 @@ system:
 
 # Deploy shared libretro cores from minarch-cores GitHub releases
 # Downloads and extracts cores for both ARM architectures
+# Override: Place zips in workspace/cores-override/ to skip download
 cores-download:
-	@echo "Downloading shared cores from minarch-cores $(MINARCH_CORES_VERSION)..."
 	@mkdir -p build/.system/cores/a7 build/.system/cores/a53
-	@echo "Downloading a7 cores (ARMv7 - cortex-a7/a9)..."
-	@curl -sL $(CORES_BASE)/linux-cortex-a7.zip -o /tmp/lessui-cores-a7.zip
-	@unzip -o -j -q /tmp/lessui-cores-a7.zip -d build/.system/cores/a7
-	@rm /tmp/lessui-cores-a7.zip
-	@echo "Downloading a53 cores (ARMv8+ - cortex-a53/a55)..."
-	@curl -sL $(CORES_BASE)/linux-cortex-a53.zip -o /tmp/lessui-cores-a53.zip
-	@unzip -o -j -q /tmp/lessui-cores-a53.zip -d build/.system/cores/a53
-	@rm /tmp/lessui-cores-a53.zip
+	@if [ -f workspace/cores-override/linux-cortex-a7.zip ]; then \
+		echo "Using local a7 cores from workspace/cores-override/..."; \
+		unzip -o -j -q workspace/cores-override/linux-cortex-a7.zip -d build/.system/cores/a7; \
+	else \
+		echo "Downloading a7 cores (ARMv7 - cortex-a7/a9) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
+		curl -sL $(CORES_BASE)/linux-cortex-a7.zip -o /tmp/lessui-cores-a7.zip; \
+		unzip -o -j -q /tmp/lessui-cores-a7.zip -d build/.system/cores/a7; \
+		rm /tmp/lessui-cores-a7.zip; \
+	fi
+	@if [ -f workspace/cores-override/linux-cortex-a53.zip ]; then \
+		echo "Using local a53 cores from workspace/cores-override/..."; \
+		unzip -o -j -q workspace/cores-override/linux-cortex-a53.zip -d build/.system/cores/a53; \
+	else \
+		echo "Downloading a53 cores (ARMv8+ - cortex-a53/a55) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
+		curl -sL $(CORES_BASE)/linux-cortex-a53.zip -o /tmp/lessui-cores-a53.zip; \
+		unzip -o -j -q /tmp/lessui-cores-a53.zip -d build/.system/cores/a53; \
+		rm /tmp/lessui-cores-a53.zip; \
+	fi
 	@echo "Cores deployed successfully:"
 	@echo "  a7:  $$(ls build/.system/cores/a7/*.so 2>/dev/null | wc -l | tr -d ' ') cores"
 	@echo "  a53: $$(ls build/.system/cores/a53/*.so 2>/dev/null | wc -l | tr -d ' ') cores"
