@@ -55,6 +55,7 @@
 #include "api.h"
 #include "defines.h"
 #include "libretro.h"
+#include "minui_file_utils.h"
 #include "scaler.h"
 #include "utils.h"
 
@@ -153,7 +154,7 @@ static struct Core {
 	const char config_dir[MAX_PATH]; // Core config: /mnt/sdcard/.userdata/<platform>/<tag>-<name>
 	const char states_dir[MAX_PATH]; // Save states: /mnt/sdcard/.userdata/<arch>/<tag>-<name>
 	const char saves_dir[MAX_PATH]; // SRAM saves: /mnt/sdcard/Saves/<tag>
-	const char bios_dir[MAX_PATH]; // BIOS files: /mnt/sdcard/Bios/<tag>
+	const char bios_dir[MAX_PATH]; // BIOS files: /mnt/sdcard/Bios/<tag> (or /Bios if tag dir empty)
 
 	// Audio/Video parameters (from core)
 	double fps; // Target frames per second
@@ -3415,11 +3416,41 @@ void Core_getName(char* in_name, char* out_name) {
 }
 
 /**
+ * Selects appropriate BIOS directory path with smart fallback.
+ *
+ * Implements intelligent BIOS path selection:
+ * - If Bios/<tag>/ exists and contains files → use tag-specific directory
+ * - If Bios/<tag>/ is empty or only has .keep/.gitkeep → fall back to Bios/ root
+ * - If Bios/<tag>/ doesn't exist → fall back to Bios/ root
+ *
+ * This allows both organized users (per-platform directories) and messy
+ * users (all BIOS files in root) to work seamlessly.
+ *
+ * @param tag Platform tag (e.g., "GB", "PS", "N64")
+ * @param bios_dir Output buffer for selected BIOS directory path
+ */
+void MinArch_selectBiosPath(const char* tag, char* bios_dir) {
+	char tag_bios_dir[MAX_PATH];
+	sprintf(tag_bios_dir, SDCARD_PATH "/Bios/%s", tag);
+
+	if (MinUI_hasNonHiddenFiles(tag_bios_dir)) {
+		strcpy(bios_dir, tag_bios_dir);
+		LOG_info("Using tag-specific BIOS directory: %s", bios_dir);
+	} else {
+		sprintf(bios_dir, SDCARD_PATH "/Bios");
+		LOG_info("Tag directory empty, falling back to root BIOS directory: %s", bios_dir);
+	}
+}
+
+/**
  * Loads a libretro core from disk and resolves API functions.
  *
  * Opens the .so file using dlopen() and resolves all required libretro
  * API function pointers using dlsym(). Also sets up directory paths for
  * saves, states, config, and BIOS files based on platform and core name.
+ *
+ * BIOS path uses smart fallback: if Bios/<tag>/ contains files, use it;
+ * otherwise fall back to Bios/ root (for users with messy BIOS folders).
  *
  * @param core_path Full path to core .so file
  * @param tag_name Platform tag (e.g., "GB", "NES")
@@ -3480,7 +3511,7 @@ void Core_open(const char* core_path, const char* tag_name) {
 	sprintf((char*)core.config_dir, USERDATA_PATH "/%s-%s", core.tag, core.name);
 	sprintf((char*)core.states_dir, SHARED_USERDATA_PATH "/%s-%s", core.tag, core.name);
 	sprintf((char*)core.saves_dir, SDCARD_PATH "/Saves/%s", core.tag);
-	sprintf((char*)core.bios_dir, SDCARD_PATH "/Bios/%s", core.tag);
+	MinArch_selectBiosPath(core.tag, (char*)core.bios_dir);
 
 	char cmd[512];
 	sprintf(cmd, "mkdir -p \"%s\"; mkdir -p \"%s\"", core.config_dir, core.states_dir);
