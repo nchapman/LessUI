@@ -11,6 +11,12 @@ constParameterPointer:*/scaler.c
 // Informational messages only
 normalCheckLevelMaxBranches
 
+// C99 compound literal parsing errors
+// Ubuntu's cppcheck 2.13.0 can't parse compound literals like &(SDL_Rect){...}
+// Newer versions (2.14-2.18) either have the same issue or segfault
+// Suppressing until we find a working version
+internalAstError
+
 // Specific known false positives
 knownConditionTrueFalse:*/api.c:1444
 knownConditionTrueFalse:*/api.c:1449

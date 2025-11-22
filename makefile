@@ -40,7 +40,17 @@ RELEASE_TIME:=$(shell TZ=GMT date +%Y%m%d)
 RELEASE_BETA=
 RELEASE_BASE=LessUI-$(RELEASE_TIME)$(RELEASE_BETA)
 RELEASE_DOT:=$(shell find -E ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base\.zip" | wc -l | sed 's/ //g')
-RELEASE_NAME=$(RELEASE_BASE)-$(RELEASE_DOT)
+# First build has no suffix, subsequent builds use -1, -2, etc.
+# Check if unnumbered base exists, if so start numbering from RELEASE_DOT+1
+RELEASE_SUFFIX:=$(shell \
+	if [ "$(RELEASE_DOT)" = "0" ] && [ ! -f "./releases/${RELEASE_BASE}-base.zip" ]; then \
+		echo ""; \
+	elif [ "$(RELEASE_DOT)" = "0" ]; then \
+		echo "-1"; \
+	else \
+		echo "-$$(($(RELEASE_DOT) + 1))"; \
+	fi)
+RELEASE_NAME=$(RELEASE_BASE)$(RELEASE_SUFFIX)
 
 ###########################################################
 # Build configuration
@@ -54,7 +64,7 @@ LOG_FLAGS = -DENABLE_INFO_LOGS -DENABLE_DEBUG_LOGS
 export LOG_FLAGS
 
 # Pre-built cores from minarch-cores repository (nightly builds)
-MINARCH_CORES_VERSION ?= 20251117
+MINARCH_CORES_VERSION ?= 20251119
 CORES_BASE = https://github.com/nchapman/minarch-cores/releases/download/$(MINARCH_CORES_VERSION)
 
 .PHONY: build test lint format dev dev-run dev-run-4x3 dev-run-16x9 dev-clean all shell name clean setup done cores-download
@@ -120,20 +130,30 @@ system:
 
 # Deploy shared libretro cores from minarch-cores GitHub releases
 # Downloads and extracts cores for both ARM architectures
+# Override: Place zips in workspace/cores-override/ to skip download
 cores-download:
-	@echo "Downloading shared cores from minarch-cores $(MINARCH_CORES_VERSION)..."
 	@mkdir -p build/.system/cores/a7 build/.system/cores/a53
-	@echo "Downloading a7 cores (ARMv7 - cortex-a7/a9)..."
-	@curl -sL $(CORES_BASE)/linux-cortex-a7.zip -o /tmp/lessui-cores-a7.zip
-	@unzip -o -j -q /tmp/lessui-cores-a7.zip -d build/.system/cores/a7
-	@rm /tmp/lessui-cores-a7.zip
-	@echo "Downloading a53 cores (ARMv8+ - cortex-a53/a55)..."
-	@curl -sL $(CORES_BASE)/linux-cortex-a53.zip -o /tmp/lessui-cores-a53.zip
-	@unzip -o -j -q /tmp/lessui-cores-a53.zip -d build/.system/cores/a53
-	@rm /tmp/lessui-cores-a53.zip
+	@if [ -f workspace/cores-override/linux-cortex-a7.zip ]; then \
+		echo "Using local a7 cores from workspace/cores-override/..."; \
+		unzip -o -j -q workspace/cores-override/linux-cortex-a7.zip -d build/.system/cores/a7; \
+	else \
+		echo "Downloading a7 cores (ARM32 - all 32-bit platforms) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
+		curl -sL $(CORES_BASE)/linux-cortex-a7.zip -o /tmp/lessui-cores-a7.zip; \
+		unzip -o -j -q /tmp/lessui-cores-a7.zip -d build/.system/cores/a7; \
+		rm /tmp/lessui-cores-a7.zip; \
+	fi
+	@if [ -f workspace/cores-override/linux-cortex-a53.zip ]; then \
+		echo "Using local a53 cores from workspace/cores-override/..."; \
+		unzip -o -j -q workspace/cores-override/linux-cortex-a53.zip -d build/.system/cores/a53; \
+	else \
+		echo "Downloading a53 cores (ARM64 - all 64-bit platforms) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
+		curl -sL $(CORES_BASE)/linux-cortex-a53.zip -o /tmp/lessui-cores-a53.zip; \
+		unzip -o -j -q /tmp/lessui-cores-a53.zip -d build/.system/cores/a53; \
+		rm /tmp/lessui-cores-a53.zip; \
+	fi
 	@echo "Cores deployed successfully:"
-	@echo "  a7:  $$(ls build/.system/cores/a7/*.so 2>/dev/null | wc -l | tr -d ' ') cores"
-	@echo "  a53: $$(ls build/.system/cores/a53/*.so 2>/dev/null | wc -l | tr -d ' ') cores"
+	@echo "  a7:  $$(ls build/.system/cores/a7/*.so 2>/dev/null | wc -l | tr -d ' ') cores (ARM32)"
+	@echo "  a53: $$(ls build/.system/cores/a53/*.so 2>/dev/null | wc -l | tr -d ' ') cores (ARM64)"
 
 # Legacy cores target - now just points to shared cores
 cores:
@@ -147,6 +167,21 @@ common: build system
 clean:
 	rm -rf ./build
 	rm -rf ./workspace/readmes
+	# Clean workspace/all component build directories
+	rm -rf workspace/all/minui/build
+	rm -rf workspace/all/minarch/build
+	rm -rf workspace/all/clock/build
+	rm -rf workspace/all/minput/build
+	rm -rf workspace/all/say/build
+	rm -rf workspace/all/syncsettings/build
+	# Clean platform-specific boot outputs
+	rm -rf workspace/rg35xxplus/boot/output
+	rm -rf workspace/rg35xx/boot/output
+	rm -rf workspace/m17/boot/output
+	# Clean copied boot assets
+	rm -f workspace/rg35xxplus/boot/*.bmp
+	rm -f workspace/rg35xx/boot/*.bmp workspace/rg35xx/boot/boot_logo.png
+	rm -f workspace/m17/boot/*.bmp
 
 # Prepare fresh build directory and skeleton
 setup: name
@@ -171,8 +206,8 @@ setup: name
 
 	# Copy boot assets to workspace for platforms that build them in Docker
 	mkdir -p ./workspace/rg35xx/boot
-	cp ./skeleton/SYSTEM/res/installing@2x.bmp ./workspace/rg35xx/boot/
-	cp ./skeleton/SYSTEM/res/updating@2x.bmp ./workspace/rg35xx/boot/
+	cp ./skeleton/SYSTEM/res/installing@2x-16bit.bmp ./workspace/rg35xx/boot/installing@2x.bmp
+	cp ./skeleton/SYSTEM/res/updating@2x-16bit.bmp ./workspace/rg35xx/boot/updating@2x.bmp
 	cp ./skeleton/SYSTEM/res/bootlogo@2x.png ./workspace/rg35xx/boot/boot_logo.png
 	mkdir -p ./workspace/rg35xxplus/boot
 	cp ./skeleton/SYSTEM/res/installing@2x.bmp ./workspace/rg35xxplus/boot/
@@ -255,12 +290,13 @@ package: tidy
 	cp -R ./build/.system/cores ./build/PAYLOAD/.system/
 	cp -R ./build/BOOT/.tmp_update ./build/PAYLOAD/
 
+	# Create LessUI.zip for update installer
 	cd ./build/PAYLOAD && zip -r LessUI.zip .system .tmp_update
 	mv ./build/PAYLOAD/LessUI.zip ./build/BASE
-	
+
 	# TODO: can I just add everything in BASE to zip?
 	cd ./build/BASE && zip -r ../../releases/$(RELEASE_NAME)-base.zip Bios Roms Saves miyoo miyoo354 trimui rg35xx rg35xxplus miyoo355 magicx miyoo285 em_ui.sh LessUI.zip README.txt
-	cd ./build/EXTRAS && zip -r ../../releases/$(RELEASE_NAME)-extras.zip Bios Emus Roms Saves Tools README.txt
+	cd ./build/EXTRAS && zip -r ../../releases/$(RELEASE_NAME)-extras.zip Bios Roms Saves Tools README.txt
 	echo "$(RELEASE_NAME)" > ./build/latest.txt
 	
 ###########################################################

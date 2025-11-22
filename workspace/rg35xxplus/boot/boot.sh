@@ -28,7 +28,7 @@ UPDATE_PATH=${SDCARD_PATH}${UPDATE_FRAG}
 # mkdir -p /mnt/sdcard
 # poweroff
 
-if [ -h $TF2_PATH ] && [ "$TF2_PATH" -ef "$TF1_PATH" ]; then
+if [ -h $TF2_PATH ] && [ "$(readlink -f "$TF2_PATH")" = "$(readlink -f "$TF1_PATH")" ]; then
 	echo "deleting old TF2 -> TF1 symlink" >> $TF1_PATH/boot.log
 	unlink $TF2_PATH
 fi
@@ -100,18 +100,18 @@ if [ -f $UPDATE_PATH ]; then
 	sync
 	echo 0,0 > /sys/class/graphics/fb0/pan
 
-	# install bootlogo.bmp
-	if [ $ACTION = "installing" ] || [ ! -f $FLAG_PATH ]; then
-		echo "replace bootlogo" >> $TF1_PATH/boot.log
+	# install/update bootlogo.bmp
+	echo "replace bootlogo" >> $TF1_PATH/boot.log
+	if [ $ACTION = "installing" ]; then
 		touch $FLAG_PATH
-		BOOT_DEVICE=/dev/mmcblk0p2
-		BOOT_PATH=/mnt/boot
-		mkdir -p $BOOT_PATH
-		mount -t vfat -o rw,utf8,noatime $BOOT_DEVICE $BOOT_PATH
-		cp /tmp/bootlogo$SUFFIX.bmp $BOOT_PATH/bootlogo.bmp
-		umount $BOOT_PATH
-		rm -rf $BOOT_PATH
 	fi
+	BOOT_DEVICE=/dev/mmcblk0p2
+	BOOT_PATH=/mnt/boot
+	mkdir -p $BOOT_PATH
+	mount -t vfat -o rw,utf8,noatime $BOOT_DEVICE $BOOT_PATH
+	cp /tmp/bootlogo$SUFFIX.bmp $BOOT_PATH/bootlogo.bmp
+	umount $BOOT_PATH
+	rm -rf $BOOT_PATH
 
 	log_info "Starting LessUI $ACTION_NOUN..."
 	if /tmp/unzip -o $UPDATE_PATH -d $SDCARD_PATH >> "$LOG_FILE" 2>&1; then
@@ -144,7 +144,7 @@ if [ -f $SYSTEM_PATH/paks/MinUI.pak/launch.sh ]; then
 	$SYSTEM_PATH/paks/MinUI.pak/launch.sh
 else
 	echo "couldn't find launch.sh" >> $TF1_PATH/boot.log
-	if [ -h $TF2_PATH ] && [ "$TF2_PATH" -ef "$TF1_PATH" ]; then
+	if [ -h $TF2_PATH ] && [ "$(readlink -f "$TF2_PATH")" = "$(readlink -f "$TF1_PATH")" ]; then
 		echo "deleting old TF2 -> TF1 symlink" >> $TF1_PATH/boot.log
 		unlink $TF2_PATH
 	fi
