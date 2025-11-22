@@ -14,7 +14,7 @@
 # The main makefile forwards to this file for test/lint/format targets.
 # Run 'make -f makefile.qa help' for complete target list.
 
-.PHONY: help lint lint-code lint-full lint-shell test test-native format format-check clean-qa docker-build docker-test docker-shell
+.PHONY: help lint lint-code lint-full lint-shell analyze test test-native format format-check clean-qa docker-build docker-test docker-shell
 
 help:
 	@echo "LessUI Quality Assurance Tools"
@@ -27,6 +27,7 @@ help:
 	@echo "Individual lint targets:"
 	@echo "  make lint-code     - Run cppcheck on workspace/all/"
 	@echo "  make lint-full     - Run cppcheck on entire workspace (verbose)"
+	@echo "  make analyze       - Run Clang Static Analyzer (deep analysis)"
 	@echo "  make format-check  - Check if code is formatted (no changes)"
 	@echo "  make lint-shell    - Run shellcheck on shell scripts"
 	@echo ""
@@ -100,6 +101,47 @@ lint-full: check-cppcheck
 	cppcheck $(CPPCHECK_FLAGS) \
 		-I workspace/all/common \
 		workspace/
+
+# Clang Static Analyzer (deep dataflow analysis)
+# Finds: NULL derefs, memory leaks, dead code, logic errors
+# Note: Runs on host (macOS), not in Docker - analyzes source, not binaries
+SCAN_BUILD = /opt/homebrew/opt/llvm/bin/scan-build
+ANALYZE_FLAGS = -DPLATFORM=\"macos\" -DSDCARD_PATH=\"../../macos/FAKESD\" -DENABLE_INFO_LOGS -DENABLE_DEBUG_LOGS \
+                -I workspace/all/common -I workspace/macos/platform \
+                -I /opt/homebrew/include -DUSE_SDL2 -std=gnu99
+
+analyze:
+	@which $(SCAN_BUILD) > /dev/null || (echo "Error: scan-build not found. Run 'brew install llvm'" && exit 1)
+	@echo "================================="
+	@echo "Running Clang Static Analyzer..."
+	@echo "================================="
+	@echo ""
+	@echo "Analyzing minarch.c..."
+	@rm -rf /tmp/lessui-analysis
+	@$(SCAN_BUILD) -o /tmp/lessui-analysis --status-bugs \
+		gcc -c workspace/all/minarch/minarch.c $(ANALYZE_FLAGS) \
+		-o /tmp/minarch.o 2>&1 | grep -v "note:" || true
+	@echo ""
+	@echo "Analyzing minui.c..."
+	@$(SCAN_BUILD) -o /tmp/lessui-analysis --status-bugs \
+		gcc -c workspace/all/minui/minui.c $(ANALYZE_FLAGS) \
+		-o /tmp/minui.o 2>&1 | grep -v "note:" || true
+	@echo ""
+	@echo "Analyzing common/*.c..."
+	@for file in workspace/all/common/*.c; do \
+		$(SCAN_BUILD) -o /tmp/lessui-analysis --status-bugs \
+			gcc -c $$file $(ANALYZE_FLAGS) \
+			-o /tmp/common.o 2>&1 | grep -v "note:" || true; \
+	done
+	@echo ""
+	@echo "================================="
+	@if ls /tmp/lessui-analysis/*/index.html >/dev/null 2>&1; then \
+		echo "⚠️  Issues found! View report:"; \
+		echo "   open /tmp/lessui-analysis/*/index.html"; \
+	else \
+		echo "✓ No issues found"; \
+	fi
+	@echo "================================="
 
 ###########################################################
 # Test Configuration
