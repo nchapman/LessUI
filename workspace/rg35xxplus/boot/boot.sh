@@ -28,7 +28,7 @@ UPDATE_PATH=${SDCARD_PATH}${UPDATE_FRAG}
 # mkdir -p /mnt/sdcard
 # poweroff
 
-if [ -h $TF2_PATH ] && [ "$TF2_PATH" -ef "$TF1_PATH" ]; then
+if [ -h $TF2_PATH ] && [ "$(readlink -f "$TF2_PATH")" = "$(readlink -f "$TF1_PATH")" ]; then
 	echo "deleting old TF2 -> TF1 symlink" >> $TF1_PATH/boot.log
 	unlink $TF2_PATH
 fi
@@ -144,7 +144,7 @@ if [ -f $SYSTEM_PATH/paks/MinUI.pak/launch.sh ]; then
 	$SYSTEM_PATH/paks/MinUI.pak/launch.sh
 else
 	echo "couldn't find launch.sh" >> $TF1_PATH/boot.log
-	if [ -h $TF2_PATH ] && [ "$TF2_PATH" -ef "$TF1_PATH" ]; then
+	if [ -h $TF2_PATH ] && [ "$(readlink -f "$TF2_PATH")" = "$(readlink -f "$TF1_PATH")" ]; then
 		echo "deleting old TF2 -> TF1 symlink" >> $TF1_PATH/boot.log
 		unlink $TF2_PATH
 	fi
