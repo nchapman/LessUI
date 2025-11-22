@@ -39,9 +39,18 @@ BUILD_HASH:=$(shell git rev-parse --short HEAD)
 RELEASE_TIME:=$(shell TZ=GMT date +%Y%m%d)
 RELEASE_BETA=
 RELEASE_BASE=LessUI-$(RELEASE_TIME)$(RELEASE_BETA)
-RELEASE_COUNT:=$(shell find -E ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base\.zip" | wc -l | sed 's/ //g')
-RELEASE_DOT:=$(shell echo $$(($(RELEASE_COUNT) + 1)))
-RELEASE_NAME=$(RELEASE_BASE)-$(RELEASE_DOT)
+RELEASE_DOT:=$(shell find -E ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base\.zip" | wc -l | sed 's/ //g')
+# First build has no suffix, subsequent builds use -1, -2, etc.
+# Check if unnumbered base exists, if so start numbering from RELEASE_DOT+1
+RELEASE_SUFFIX:=$(shell \
+	if [ "$(RELEASE_DOT)" = "0" ] && [ ! -f "./releases/${RELEASE_BASE}-base.zip" ]; then \
+		echo ""; \
+	elif [ "$(RELEASE_DOT)" = "0" ]; then \
+		echo "-1"; \
+	else \
+		echo "-$$(($(RELEASE_DOT) + 1))"; \
+	fi)
+RELEASE_NAME=$(RELEASE_BASE)$(RELEASE_SUFFIX)
 
 ###########################################################
 # Build configuration
