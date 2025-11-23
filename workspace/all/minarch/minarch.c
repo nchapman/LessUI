@@ -485,7 +485,7 @@ static void Game_open(char* path) {
 		fseek(file, 0, SEEK_END);
 		game.size = ftell(file);
 
-		rewind(file);
+		fseek(file, 0, SEEK_SET);
 		game.data = malloc(game.size);
 		if (game.data == NULL) {
 			LOG_error("Couldn't allocate memory for file: %s", path);
@@ -757,6 +757,7 @@ static void State_read(void) {
 	int was_ff = fast_forward;
 	fast_forward = 0;
 
+	FILE* state_file = NULL;
 	void* state = calloc(1, state_size);
 	if (!state) {
 		LOG_error("Couldn't allocate memory for state");
@@ -766,7 +767,6 @@ static void State_read(void) {
 	char filename[MAX_PATH];
 	State_getPath(filename);
 
-	FILE* state_file = NULL;
 	state_file = fopen(filename, "r");
 	if (!state_file) {
 		if (state_slot != 8) { // st8 is a default state in MiniUI and may not exist, that's okay
@@ -813,6 +813,7 @@ static void State_write(void) {
 	int was_ff = fast_forward;
 	fast_forward = 0;
 
+	FILE* state_file = NULL;
 	void* state = calloc(1, state_size);
 	if (!state) {
 		LOG_error("Couldn't allocate memory for state");
@@ -822,7 +823,6 @@ static void State_write(void) {
 	char filename[MAX_PATH];
 	State_getPath(filename);
 
-	FILE* state_file = NULL;
 	state_file = fopen(filename, "w");
 	if (!state_file) {
 		LOG_error("Error opening state file: %s (%s)", filename, strerror(errno));
@@ -2711,7 +2711,7 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		if (infos) {
 			// TODO: store to gamepad_values/gamepad_labels for gamepad_device
 			const struct retro_controller_info* info = &infos[0];
-			for (int i = 0; i < info->num_types; i++) {
+			for (unsigned int i = 0; i < info->num_types; i++) {
 				const struct retro_controller_description* type = &info->types[i];
 				if (exactMatch((char*)type->desc,
 				               "dualshock")) { // currently only enabled for PlayStation
@@ -3185,7 +3185,7 @@ static void blitBitmapText(char* text, int ox, int oy, uint16_t* data, int strid
 		row = data + y * stride;
 		memset(row - 1, 0, (w + 2) * 2);
 		for (int i = 0; i < len; i++) {
-			const char* c = bitmap_font[text[i]];
+			const char* c = bitmap_font[(unsigned char)text[i]];
 			for (int x = 0; x < CHAR_WIDTH; x++) {
 				int j = y * CHAR_WIDTH + x;
 				if (c[j] == '1')
@@ -3583,7 +3583,6 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 			dst_h = scaled_h;
 			dst_p = dst_w * FIXED_BPP;
 		} else {
-			double src_aspect_ratio = ((double)src_w) / src_h;
 			// double core_aspect_ratio
 			double fixed_aspect_ratio = ((double)DEVICE_WIDTH) / DEVICE_HEIGHT;
 			int core_aspect = core.aspect_ratio * 1000;
@@ -4327,6 +4326,7 @@ static int OptionFrontend_openMenu(MenuList* list, int i) {
 
 static int OptionEmulator_optionChanged(MenuList* list, int i) {
 	MenuItem* item = &list->items[i];
+	// NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) - option IS used in LOG_info below
 	Option* option = OptionList_getOption(&config.core, item->key);
 	LOG_info("%s (%s) changed from `%s` (%s) to `%s` (%s)", item->name, item->key,
 	         item->values[option->value], option->values[option->value], item->values[item->value],
@@ -5274,7 +5274,7 @@ static void Menu_scale(SDL_Surface* src, SDL_Surface* dst) {
 	int mx = (sw << 16) / rw;
 	int my = (sh << 16) / rh;
 	int ox = (renderer.src_x << 16);
-	int sx = ox;
+	int sx;
 	int sy = (renderer.src_y << 16);
 	int lr = -1;
 	int sr = 0;
@@ -5567,35 +5567,28 @@ static void Menu_loop(void) {
 		}
 
 		if (PAD_justPressed(BTN_B) || (BTN_WAKE != BTN_MENU && PAD_tappedMenu(now))) {
-			status = STATUS_CONT;
 			show_menu = 0;
 		} else if (PAD_justPressed(BTN_A)) {
 			switch (selected) {
 			case ITEM_CONT:
 				if (menu.total_discs && rom_disc != menu.disc) {
-					status = STATUS_DISC;
 					char* disc_path = menu.disc_paths[menu.disc];
 					Game_changeDisc(disc_path);
-				} else {
-					status = STATUS_CONT;
 				}
 				show_menu = 0;
 				break;
 
 			case ITEM_SAVE: {
 				Menu_saveState();
-				status = STATUS_SAVE;
 				show_menu = 0;
 			} break;
 			case ITEM_LOAD: {
 				Menu_loadState();
-				status = STATUS_LOAD;
 				show_menu = 0;
 			} break;
 			case ITEM_OPTS: {
 				if (simple_mode) {
 					core.reset();
-					status = STATUS_RESET;
 					show_menu = 0;
 				} else {
 					int old_scaling = screen_scaling;
@@ -5615,7 +5608,6 @@ static void Menu_loop(void) {
 				}
 			} break;
 			case ITEM_QUIT:
-				status = STATUS_QUIT;
 				show_menu = 0;
 				quit = 1; // TODO: tmp?
 				break;
@@ -5893,7 +5885,7 @@ static void limitFF(void) {
 			last_time = now;
 		int elapsed = now - last_time;
 		if (elapsed > 0 && elapsed < 0x80000) {
-			if (elapsed < ff_frame_time) {
+			if ((uint64_t)elapsed < ff_frame_time) {
 				int delay = (ff_frame_time - elapsed) / 1000;
 				if (delay > 0 && delay < 17) { // don't allow a delay any greater than a frame
 					SDL_Delay(delay);

@@ -48,7 +48,8 @@ help:
 # Checks for: bugs, performance issues, readability, security
 # Configuration in .clang-tidy file
 # workspace/all/ is the primary focus (platform-independent code)
-CLANG_TIDY = clang-tidy
+# Use LLVM 18 to match CI (GitHub Actions uses Ubuntu LLVM 18.1.3)
+CLANG_TIDY = $(shell /opt/homebrew/opt/llvm@18/bin/clang-tidy --version >/dev/null 2>&1 && echo /opt/homebrew/opt/llvm@18/bin/clang-tidy || which clang-tidy)
 TIDY_FLAGS = --quiet
 
 # Source files to analyze
@@ -311,7 +312,8 @@ clean-tests:
 
 ###########################################################
 # Code Formatting
-CLANG_FORMAT = clang-format
+# Use LLVM 18 to match CI
+CLANG_FORMAT = $(shell /opt/homebrew/opt/llvm@18/bin/clang-format --version >/dev/null 2>&1 && echo /opt/homebrew/opt/llvm@18/bin/clang-format || which clang-format)
 FORMAT_PATHS = workspace/all/minui/*.c \
                workspace/all/minarch/*.c \
                workspace/all/common/*.c \
