@@ -17,7 +17,7 @@
 
 #include <string.h>
 
-DEFINE_FFF_GLOBALS;
+// Note: DEFINE_FFF_GLOBALS is in sdl_fakes.c, not here
 
 // Mock font for testing
 static TTF_Font mock_font = {.point_size = 16, .style = 0};

@@ -216,7 +216,7 @@ make -f makefile.qa format-check   # Check formatting only
 make -f makefile.qa clean-tests    # Clean test artifacts
 ```
 
-**Note:** Tests run in Docker by default, using a Debian Buster ARM64 container that matches the platform toolchains (GCC 8.3.0). This eliminates macOS-specific build issues and ensures consistency with the actual build environment.
+**Note:** Tests run in Docker by default, using an Ubuntu 24.04 container. This eliminates macOS-specific build issues and ensures consistency across all development environments.
 
 ### Test Organization
 
@@ -409,8 +409,8 @@ To enable comprehensive testing, complex logic has been extracted from large fil
 - **GCC --wrap** - Link-time file system function mocking (read operations)
 - **Real temp files** - For write operations and binary I/O (mkstemp, mkdtemp)
 - **Unity** - Test framework with assertions and test runner
-- **Docker** - Debian Buster ARM64 container matching platform toolchains (GCC 8.3.0)
+- **Docker** - Ubuntu 24.04 container for consistent testing environment
 
-All tests run in Docker by default to ensure consistency with the cross-compilation environment.
+All tests run in Docker by default to ensure consistency across all development environments.
 
 See `tests/README.md` for comprehensive testing guide and examples.

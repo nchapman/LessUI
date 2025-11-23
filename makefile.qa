@@ -2,7 +2,7 @@
 # Static analysis, testing, and code formatting
 #
 # This makefile provides quality assurance tools for the LessUI codebase:
-#   - Unit tests (Docker-based, using Debian Buster + GCC 8.3.0)
+#   - Unit tests (Docker-based, using Ubuntu 24.04)
 #   - Static analysis (clang-tidy for C code, shellcheck for scripts)
 #   - Code formatting (clang-format with project style)
 #
@@ -14,7 +14,7 @@
 # The main makefile forwards to this file for test/lint/format targets.
 # Run 'make -f makefile.qa help' for complete target list.
 
-.PHONY: help lint lint-code lint-full lint-shell analyze test test-native format format-check clean-qa docker-build docker-test docker-shell
+.PHONY: help lint lint-code lint-full lint-shell analyze analyze-native test test-native format format-native format-check clean-qa clean-tests docker-build docker-test docker-lint docker-analyze docker-format docker-format-check docker-shell lint-native report
 
 help:
 	@echo "LessUI Quality Assurance Tools"
@@ -32,9 +32,10 @@ help:
 	@echo "  make lint-shell    - Run shellcheck on shell scripts"
 	@echo ""
 	@echo "Docker targets:"
-	@echo "  make docker-test   - Run tests in Debian Buster container"
-	@echo "  make docker-build  - Build test Docker image"
-	@echo "  make docker-shell  - Enter Docker container for debugging"
+	@echo "  make docker-test    - Run tests in Docker container (Ubuntu 24.04)"
+	@echo "  make docker-analyze - Run static analysis in Docker container"
+	@echo "  make docker-build   - Build Docker image"
+	@echo "  make docker-shell   - Enter Docker container for debugging"
 	@echo ""
 	@echo "Other:"
 	@echo "  make test-native   - Run tests natively (not recommended on macOS)"
@@ -124,17 +125,17 @@ lint-full: check-clang-tidy
 
 # Clang Static Analyzer (deep dataflow analysis)
 # Finds: NULL derefs, memory leaks, dead code, logic errors
-# Note: Runs on host (not in Docker) - analyzes source, not binaries
-# Works on macOS (Homebrew) and Linux (apt packages)
+# Runs in Docker by default for consistency with CI
 
-# Auto-detect scan-build location
+# Auto-detect scan-build location (for native builds)
 SCAN_BUILD := $(shell which scan-build 2>/dev/null || which /opt/homebrew/opt/llvm/bin/scan-build 2>/dev/null)
 
-# Auto-detect SDL2 include path (works on both macOS and Ubuntu)
-SDL2_CFLAGS := $(shell sdl2-config --cflags 2>/dev/null)
+# Note: SDL2_CFLAGS defined above (line 67)
 
-ANALYZE_FLAGS = -DPLATFORM=\"macos\" -DSDCARD_PATH=\"../../macos/FAKESD\" -DENABLE_INFO_LOGS -DENABLE_DEBUG_LOGS \
-                -I workspace/all/common -I workspace/macos/platform \
+ANALYZE_FLAGS = -DPLATFORM=\"desktop\" -DSDCARD_PATH=\"../../desktop/FAKESD\" -DENABLE_INFO_LOGS -DENABLE_DEBUG_LOGS \
+                -I workspace/all/common -I workspace/desktop/platform \
+                -I workspace/all/minarch/libretro-common/include \
+                -iquote workspace/all/minarch/libretro-common/include \
                 $(SDL2_CFLAGS) -DUSE_SDL2 -std=gnu99
 
 check-scan-build:
@@ -145,7 +146,11 @@ check-scan-build:
 		exit 1; \
 	fi
 
-analyze: check-scan-build
+# Default: use Docker for consistency
+analyze: docker-analyze
+
+# Native analysis (for advanced use)
+analyze-native: check-scan-build
 	@echo "================================="
 	@echo "Running Clang Static Analyzer..."
 	@echo "================================="
@@ -317,8 +322,8 @@ FORMAT_PATHS = workspace/all/minui/*.c \
 check-clang-format:
 	@which $(CLANG_FORMAT) > /dev/null || (echo "Error: clang-format not installed. Run 'brew install llvm' or 'apt-get install clang-format'" && exit 1)
 
-# Format code in-place (MODIFIES FILES)
-format: check-clang-format
+# Format code in-place (MODIFIES FILES) - Native implementation
+format-native: check-clang-format
 	@echo "Formatting code with clang-format..."
 	@$(CLANG_FORMAT) -i $(FORMAT_PATHS)
 	@echo "✓ Code formatted"
@@ -338,13 +343,13 @@ format-check: check-clang-format
 # Find all shell scripts we maintain (exclude third-party code)
 # Excludes:
 #   - workspace/*/other/* (third-party SDL, DTC, etc.)
-#   - workspace/macos/FAKESD/* (generated test data)
+#   - workspace/desktop/FAKESD/* (test data)
 #   - cores, toolchains (third-party)
 SHELL_SCRIPTS = $(shell find skeleton workspace -name "*.sh" -type f \
                  -not -path "*/cores/*" \
                  -not -path "*/toolchains/*" \
                  -not -path "*/other/*" \
-                 -not -path "*/macos/FAKESD/*" \
+                 -not -path "*/desktop/FAKESD/*" \
                  -not -path "*/em_ui.sh" \
                  2>/dev/null)
 ROOT_SCRIPTS = commits.sh
@@ -391,32 +396,27 @@ report: check-clang-tidy
 DEV_IMAGE = lessui-dev
 DEV_RUN = docker run --rm -v $(shell pwd):/lessui -w /lessui $(DEV_IMAGE)
 
-# Legacy test container (Debian Buster, for --wrap support)
-TEST_IMAGE = minui-test
-TEST_RUN = docker run --rm -v $(shell pwd):/minui -w /minui $(TEST_IMAGE)
-
 docker-build:
 	@echo "Building dev Docker image (Ubuntu 24.04, matches GitHub CI)..."
 	docker build -t $(DEV_IMAGE) -f Dockerfile .
 	@echo "✓ Dev image ready"
 
-docker-test-build:
-	@echo "Building test Docker image (Debian Buster, for GCC --wrap)..."
-	docker build -t $(TEST_IMAGE) -f tests/Dockerfile .
-	@echo "✓ Test image ready"
-
-docker-test: docker-test-build
-	@echo "Running tests in Docker container (Debian Buster)..."
+docker-test: docker-build
+	@echo "Running tests in Docker container (Ubuntu 24.04)..."
 	@echo ""
-	$(TEST_RUN) make -f makefile.qa clean-tests test-native
+	$(DEV_RUN) make -f makefile.qa clean-tests test-native
 
 docker-lint: docker-build
 	@echo "Running linting in Docker container (Ubuntu 24.04)..."
 	$(DEV_RUN) make -f makefile.qa lint-native
 
+docker-analyze: docker-build
+	@echo "Running static analysis in Docker container (Ubuntu 24.04)..."
+	$(DEV_RUN) make -f makefile.qa analyze-native
+
 docker-format: docker-build
 	@echo "Running formatter in Docker container (Ubuntu 24.04)..."
-	$(DEV_RUN) make -f makefile.qa format
+	$(DEV_RUN) make -f makefile.qa format-native
 
 docker-format-check: docker-build
 	@echo "Checking formatting in Docker container (Ubuntu 24.04)..."

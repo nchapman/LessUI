@@ -10,21 +10,21 @@ This directory contains the test suite for LessUI, organized to mirror the sourc
 make test   # Run all 364 tests in Docker (recommended)
 ```
 
-Tests run in a Debian Buster ARM64 container that matches the platform toolchains exactly. This ensures consistency across development environments and catches platform-specific issues.
+Tests run in an Ubuntu 24.04 Docker container. This ensures consistency across development environments and catches platform-specific issues.
 
 ## Test Environment
 
 **Docker Container Specifications:**
-- Base: Debian Buster (10) ARM64
-- Compiler: GCC 8.3.0-6 (matches platform toolchains)
-- C Library: GLIBC 2.28
-- Architecture: aarch64 (falls back to C implementations for 32-bit ARM assembly)
-- Dockerfile: `tests/Dockerfile`
+- Base: Ubuntu 24.04 LTS
+- Compiler: Modern GCC
+- Complete QA toolchain (clang-tidy, clang-format, shellcheck)
+- SDL2 development libraries included
+- Dockerfile: `Dockerfile`
 
 **Why Docker?**
-- Eliminates macOS ARM architecture differences
-- Matches the exact GCC/libc versions used by platform toolchains
-- Consistent test results across all development machines
+- Consistent environment across all development machines
+- Matches GitHub Actions CI environment
+- Eliminates platform-specific differences
 - No need to install native build tools on macOS
 
 ## Directory Structure
@@ -60,7 +60,7 @@ tests/
 │   ├── sdl_fakes.h/c               # SDL function mocks (fff-based)
 │   ├── platform_mocks.h/c          # Platform function mocks
 │   └── fs_mocks.h/c                # File system mocks (--wrap-based)
-├── Dockerfile                      # Test environment (Debian Buster ARM64)
+├── Dockerfile                      # Test environment (Ubuntu 24.04)
 └── README.md                       # This file
 ```
 
@@ -111,7 +111,7 @@ This makes it easy to:
 
 ### Docker-Based Testing (Default)
 
-Tests run in a Debian Buster ARM64 container that matches the platform toolchains exactly (GCC 8.3.0, GLIBC 2.28). This eliminates macOS-specific build issues and ensures consistency with the actual build environment.
+Tests run in an Ubuntu 24.04 container. This eliminates macOS-specific build issues and ensures consistency across all development environments.
 
 ```bash
 # Run all tests (uses Docker automatically)
@@ -414,7 +414,7 @@ gcc ... -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fgets
 
 **Platform support:**
 - ✅ Linux (GCC/GNU ld)
-- ✅ Docker (Debian Buster with GCC) - **This is how we test**
+- ✅ Docker (Ubuntu 24.04 with GCC) - **This is how we test**
 - ❌ macOS (uses ld64, doesn't support --wrap)
 
 ### Using File Mocking
@@ -1007,7 +1007,7 @@ make test   # All tests in Docker
 ```
 
 CI systems should have Docker available. The test environment will automatically:
-- Pull/build the Debian Buster ARM64 test image
+- Pull/build the Ubuntu 24.04 test image
 - Compile and run all tests
 - Report any failures
 
@@ -1028,7 +1028,7 @@ gcc -g -o tests/utils_test_debug tests/unit/all/common/test_utils.c \
     -I tests/support -I tests/support/unity -I workspace/all/common \
     -std=c99
 
-# Run with gdb (lldb not available in Debian Buster)
+# Run with gdb
 gdb tests/utils_test_debug
 (gdb) run
 (gdb) bt  # backtrace when crash occurs
