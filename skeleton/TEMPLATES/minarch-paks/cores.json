@@ -42,6 +42,9 @@
     "PCE": {
       "emu_exe": "mednafen_pce_fast"
     },
+    "PCECD": {
+      "emu_exe": "mednafen_pce_fast"
+    },
     "P8": {
       "emu_exe": "fake08"
     },
