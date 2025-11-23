@@ -60,8 +60,7 @@ TIDY_SOURCES = workspace/all/minui/*.c \
                workspace/all/common/*.c \
                workspace/all/minput/*.c \
                workspace/all/say/*.c \
-               workspace/all/syncsettings/*.c \
-               workspace/*/platform/*.c
+               workspace/all/syncsettings/*.c
 
 # Auto-detect SDL2 include path (works on both macOS and Ubuntu)
 SDL2_CFLAGS := $(shell sdl2-config --cflags 2>/dev/null)
@@ -97,21 +96,8 @@ check-clang-tidy:
 check-shellcheck:
 	@which shellcheck > /dev/null || (echo "Error: shellcheck not installed. Run 'brew install shellcheck' or 'apt-get install shellcheck'" && exit 1)
 
-# Run all linting checks (code, format, shell scripts)
-lint: check-clang-tidy check-clang-format check-shellcheck
-	@echo "=================================" && \
-	echo "Running ALL linting checks..." && \
-	echo "=================================" && \
-	echo "" && \
-	$(MAKE) -f makefile.qa lint-code && \
-	echo "" && \
-	$(MAKE) -f makefile.qa format-check && \
-	echo "" && \
-	$(MAKE) -f makefile.qa lint-shell && \
-	echo "" && \
-	echo "=================================" && \
-	echo "✓ All linting checks passed" && \
-	echo "================================="
+# Run all linting checks (uses Docker for consistency with CI)
+lint: docker-lint
 
 # Run clang-tidy on common code (platform-independent, highest priority)
 lint-code: check-clang-tidy
@@ -200,8 +186,9 @@ TEST_UNITY = tests/support/unity/unity.c
 # All test executables (built from tests/unit/ and tests/integration/)
 TEST_EXECUTABLES = tests/utils_test tests/pad_test tests/collections_test tests/gfx_text_test tests/audio_resampler_test tests/minarch_paths_test tests/minui_utils_test tests/m3u_parser_test tests/minui_file_utils_test tests/map_parser_test tests/collection_parser_test tests/recent_parser_test tests/recent_writer_test tests/directory_utils_test tests/binary_file_utils_test tests/integration_workflows_test
 
-# Default test target: use Docker
+# Default targets: use Docker for consistency
 test: docker-test
+format: docker-format
 
 # Native test target (for Linux or if Docker unavailable)
 test-native: $(TEST_EXECUTABLES)
@@ -400,24 +387,57 @@ report: check-clang-tidy
 	@wc -l clang-tidy-report.txt
 
 ###########################################################
-# Docker Testing (recommended for consistency)
-DOCKER_IMAGE = minui-test
-DOCKER_RUN = docker run --rm -v $(shell pwd):/minui -w /minui $(DOCKER_IMAGE)
+# Docker QA (recommended for consistency with CI)
+DEV_IMAGE = lessui-dev
+DEV_RUN = docker run --rm -v $(shell pwd):/lessui -w /lessui $(DEV_IMAGE)
+
+# Legacy test container (Debian Buster, for --wrap support)
+TEST_IMAGE = minui-test
+TEST_RUN = docker run --rm -v $(shell pwd):/minui -w /minui $(TEST_IMAGE)
 
 docker-build:
-	@echo "Building test Docker image (Debian Buster)..."
-	docker build -t $(DOCKER_IMAGE) -f tests/Dockerfile .
-	@echo "✓ Docker image ready"
+	@echo "Building dev Docker image (Ubuntu 24.04, matches GitHub CI)..."
+	docker build -t $(DEV_IMAGE) -f Dockerfile .
+	@echo "✓ Dev image ready"
 
-docker-test: docker-build
+docker-test-build:
+	@echo "Building test Docker image (Debian Buster, for GCC --wrap)..."
+	docker build -t $(TEST_IMAGE) -f tests/Dockerfile .
+	@echo "✓ Test image ready"
+
+docker-test: docker-test-build
 	@echo "Running tests in Docker container (Debian Buster)..."
 	@echo ""
-	$(DOCKER_RUN) make -f makefile.qa clean-tests test-native
+	$(TEST_RUN) make -f makefile.qa clean-tests test-native
 
 docker-lint: docker-build
-	@echo "Running linting in Docker container..."
-	$(DOCKER_RUN) make -f makefile.qa lint
+	@echo "Running linting in Docker container (Ubuntu 24.04)..."
+	$(DEV_RUN) make -f makefile.qa lint-native
+
+docker-format: docker-build
+	@echo "Running formatter in Docker container (Ubuntu 24.04)..."
+	$(DEV_RUN) make -f makefile.qa format
+
+docker-format-check: docker-build
+	@echo "Checking formatting in Docker container (Ubuntu 24.04)..."
+	$(DEV_RUN) make -f makefile.qa format-check
 
 docker-shell: docker-build
-	@echo "Entering Docker container shell..."
-	docker run --rm -it -v $(shell pwd):/minui -w /minui $(DOCKER_IMAGE) /bin/bash
+	@echo "Entering dev container shell (Ubuntu 24.04)..."
+	docker run --rm -it -v $(shell pwd):/lessui -w /lessui $(DEV_IMAGE) /bin/bash
+
+# Native targets (runs directly on host)
+lint-native: check-clang-tidy check-clang-format check-shellcheck
+	@echo "=================================" && \
+	echo "Running ALL linting checks..." && \
+	echo "=================================" && \
+	echo "" && \
+	$(MAKE) -f makefile.qa lint-code && \
+	echo "" && \
+	$(MAKE) -f makefile.qa format-check && \
+	echo "" && \
+	$(MAKE) -f makefile.qa lint-shell && \
+	echo "" && \
+	echo "=================================" && \
+	echo "✓ All linting checks passed" && \
+	echo "================================="
