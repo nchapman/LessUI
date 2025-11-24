@@ -83,6 +83,19 @@ static SDL_Surface* backbuffer = NULL; // Double-buffer for threaded rendering
 // Forward declaration
 static void* coreThread(void* arg);
 
+// Video geometry state for dynamic updates
+static struct {
+	unsigned rotation; // 0=0°, 1=90°, 2=180°, 3=270°
+	int geometry_changed; // Flag for SET_GEOMETRY
+	int av_info_changed; // Flag for SET_SYSTEM_AV_INFO
+	retro_frame_time_callback_t frame_time_cb; // Frame timing callback
+	retro_usec_t frame_time_ref; // Reference frame time in microseconds
+} video_state = {.rotation = 0,
+                 .geometry_changed = 0,
+                 .av_info_changed = 0,
+                 .frame_time_cb = NULL,
+                 .frame_time_ref = 0};
+
 ///////////////////////////////////////
 // Video Scaling Modes
 ///////////////////////////////////////
@@ -2570,10 +2583,22 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	// LOG_info("environment_callback: %i", cmd);
 
 	switch (cmd) {
-	// case RETRO_ENVIRONMENT_SET_ROTATION: { /* 1 */
-	// 	LOG_info("RETRO_ENVIRONMENT_SET_ROTATION %i", *(int *)data); // core requests frontend to handle rotation
-	// 	break;
-	// }
+	case RETRO_ENVIRONMENT_SET_ROTATION: { /* 1 */
+		const unsigned* rotation = (const unsigned*)data;
+		if (!rotation) {
+			LOG_error("SET_ROTATION called with NULL data");
+			return false;
+		}
+
+		if (*rotation > 3) {
+			LOG_error("SET_ROTATION invalid value: %u (must be 0-3)", *rotation);
+			return false;
+		}
+
+		// Store rotation state but don't apply (platform-specific handling)
+		video_state.rotation = *rotation;
+		break;
+	}
 	case RETRO_ENVIRONMENT_GET_OVERSCAN: { /* 2 */
 		bool* out = (bool*)data;
 		if (out)
@@ -2673,7 +2698,21 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK: { /* 21 */
-		// LOG_info("%i: RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK", cmd);
+		const struct retro_frame_time_callback* cb = (const struct retro_frame_time_callback*)data;
+		if (!cb) {
+			LOG_error("SET_FRAME_TIME_CALLBACK called with NULL data");
+			return false;
+		}
+
+		if (!cb->callback) {
+			// NULL callback = unregister
+			video_state.frame_time_cb = NULL;
+			video_state.frame_time_ref = 0;
+			break;
+		}
+
+		video_state.frame_time_cb = cb->callback;
+		video_state.frame_time_ref = cb->reference;
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK: { /* 22 */
@@ -2705,6 +2744,40 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 			*out = core.saves_dir; // save_dir;
 		break;
 	}
+	case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: { /* 32 */
+		const struct retro_system_av_info* av_info = (const struct retro_system_av_info*)data;
+		if (!av_info) {
+			LOG_error("SET_SYSTEM_AV_INFO called with NULL data");
+			return false;
+		}
+
+		LOG_debug("SET_SYSTEM_AV_INFO: %ux%u @ %.2f fps, %.0f Hz", av_info->geometry.base_width,
+		          av_info->geometry.base_height, av_info->timing.fps, av_info->timing.sample_rate);
+
+		// Update geometry
+		if (av_info->geometry.aspect_ratio > 0.0) {
+			core.aspect_ratio = av_info->geometry.aspect_ratio;
+		} else {
+			core.aspect_ratio =
+			    (double)av_info->geometry.base_width / av_info->geometry.base_height;
+		}
+
+		// Update timing
+		double old_sample_rate = core.sample_rate;
+		core.fps = av_info->timing.fps;
+		core.sample_rate = av_info->timing.sample_rate;
+
+		// Reinitialize audio if sample rate changed
+		if (old_sample_rate != core.sample_rate) {
+			SND_quit();
+			SND_init(core.sample_rate, core.fps);
+		}
+
+		// Force scaler recalculation
+		renderer.dst_p = 0;
+		video_state.av_info_changed = 1;
+		return true;
+	}
 	case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: { /* 35 */
 		// LOG_info("RETRO_ENVIRONMENT_SET_CONTROLLER_INFO");
 		const struct retro_controller_info* infos = (const struct retro_controller_info*)data;
@@ -2723,6 +2796,26 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		}
 		return false; // TODO: tmp
 		break;
+	}
+	case RETRO_ENVIRONMENT_SET_GEOMETRY: { /* 37 */
+		const struct retro_game_geometry* geometry = (const struct retro_game_geometry*)data;
+		if (!geometry) {
+			LOG_error("SET_GEOMETRY called with NULL data");
+			return false;
+		}
+
+		LOG_debug("SET_GEOMETRY: %ux%u aspect: %.3f", geometry->base_width, geometry->base_height,
+		          geometry->aspect_ratio);
+
+		// NOTE: Do NOT update core.aspect_ratio here!
+		// SET_GEOMETRY reports "display" dimensions which may differ from actual
+		// video_refresh frame dimensions (e.g. Stella reports 320 but sends 160).
+		// Aspect ratio should only be updated via SET_SYSTEM_AV_INFO.
+
+		// Force scaler recalculation on next video_refresh
+		renderer.dst_p = 0;
+		video_state.geometry_changed = 1;
+		return true;
 	}
 	// RETRO_ENVIRONMENT_SET_MEMORY_MAPS (36 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_LANGUAGE 39
@@ -2747,6 +2840,22 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	// RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS (42 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_VFS_INTERFACE (45 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE (47 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+	case RETRO_ENVIRONMENT_GET_FASTFORWARDING: { /* 49 */
+		bool* out = (bool*)data;
+		if (out) {
+			*out = fast_forward ? true : false;
+			return true;
+		}
+		return false;
+	}
+	case RETRO_ENVIRONMENT_GET_TARGET_REFRESH_RATE: { /* 50 | RETRO_ENVIRONMENT_EXPERIMENTAL */
+		float* out = (float*)data;
+		if (out) {
+			*out = (float)core.fps;
+			return true;
+		}
+		return false;
+	}
 	// RETRO_ENVIRONMENT_GET_INPUT_BITMASKS (51 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS: { /* 51 | RETRO_ENVIRONMENT_EXPERIMENTAL */
 		bool* out = (bool*)data;
@@ -2853,6 +2962,26 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 			*out = 1;
 
 		break;
+	}
+	case RETRO_ENVIRONMENT_GET_THROTTLE_STATE: { /* 71 | RETRO_ENVIRONMENT_EXPERIMENTAL */
+		struct retro_throttle_state* state = (struct retro_throttle_state*)data;
+		if (!state) {
+			return false;
+		}
+
+		// Determine current throttle mode
+		if (fast_forward) {
+			state->mode = RETRO_THROTTLE_FAST_FORWARD;
+			state->rate = (float)(max_ff_speed + 1); // max_ff_speed: 0=2x, 1=3x, 2=4x, 3=5x
+		} else if (prevent_tearing) {
+			state->mode = RETRO_THROTTLE_VSYNC;
+			state->rate = 1.0f;
+		} else {
+			state->mode = RETRO_THROTTLE_UNBLOCKED;
+			state->rate = 1.0f;
+		}
+
+		return true;
 	}
 
 		// unused
@@ -3724,12 +3853,23 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 	// if source has changed size (or forced by dst_p==0)
 	// eg. true src + cropped src + fixed dst + cropped dst
 	if (renderer.dst_p == 0 || (int)width != renderer.true_w || (int)height != renderer.true_h) {
+		if ((int)width != renderer.true_w || (int)height != renderer.true_h) {
+			LOG_debug("Video dimensions changed: %dx%d -> %ux%u", renderer.true_w, renderer.true_h,
+			          width, height);
+		}
 		selectScaler(width, height, rgb565_pitch);
 		GFX_clearAll();
 	}
 
 	// Perform pixel format conversion if needed (after buffer is allocated)
 	if (downsample) {
+		// Validate pitch before attempting conversion
+		size_t min_pitch = width * sizeof(uint32_t);
+		if (pitch < min_pitch) {
+			LOG_error("Skipping frame due to invalid pitch: %zu < %zu", pitch, min_pitch);
+			return; // Abort entire frame to prevent rendering corrupted data
+		}
+
 		buffer_downsample(data, width, height, pitch);
 		renderer.src = buffer;
 	} else {
@@ -3825,6 +3965,15 @@ static void video_refresh_callback(const void* data, unsigned width, unsigned he
 
 		// Copy or convert data to backbuffer
 		if (downsample) {
+			// Validate pitch before attempting conversion
+			size_t min_pitch = width * sizeof(uint32_t);
+			if (pitch < min_pitch) {
+				LOG_error("Skipping threaded frame due to invalid pitch: %zu < %zu", pitch,
+				          min_pitch);
+				pthread_mutex_unlock(&core_mx);
+				return; // Abort frame to prevent buffer corruption
+			}
+
 			// Core provided XRGB8888, convert to tightly-packed RGB565
 			buffer_downsample(data, width, height, pitch);
 			if (!buffer) {
@@ -5927,6 +6076,12 @@ static void* coreThread(void* arg) {
 		pthread_mutex_unlock(&core_mx);
 
 		if (run) {
+			// Call frame time callback if registered
+			if (video_state.frame_time_cb) {
+				retro_usec_t current_time = SDL_GetTicks() * 1000; // Convert ms to µs
+				video_state.frame_time_cb(current_time);
+			}
+
 			core.run();
 			limitFF();
 			trackFPS();
@@ -6057,6 +6212,12 @@ int main(int argc, char* argv[]) {
 	sec_start = SDL_GetTicks();
 	while (!quit) {
 		GFX_startFrame();
+
+		// Call frame time callback if registered
+		if (video_state.frame_time_cb) {
+			retro_usec_t current_time = SDL_GetTicks() * 1000; // Convert ms to µs
+			video_state.frame_time_cb(current_time);
+		}
 
 		if (!thread_video) {
 			core.run();
