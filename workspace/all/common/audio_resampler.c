@@ -100,12 +100,23 @@ ResampleResult AudioResampler_resample(AudioResampler* resampler, AudioRingBuffe
 		// Generate output samples while frac_pos < FRAC_ONE
 		// (we're still interpolating between prev and curr)
 		while (frac_pos < FRAC_ONE) {
+			// Check for buffer overflow before writing
+			if (buffer) {
+				int next_pos = buffer->write_pos + 1;
+				if (next_pos >= buffer->capacity)
+					next_pos = 0;
+				if (next_pos == buffer->read_pos) {
+					// Buffer full - stop and save state for next call
+					goto done;
+				}
+			}
+
 			// Interpolate between prev and curr
 			SND_Frame out;
 			out.left = lerp_s16(prev.left, curr.left, frac_pos);
 			out.right = lerp_s16(prev.right, curr.right, frac_pos);
 
-			// Write to buffer if provided
+			// Write to buffer
 			if (buffer) {
 				buffer->frames[buffer->write_pos] = out;
 				buffer->write_pos++;
@@ -125,6 +136,7 @@ ResampleResult AudioResampler_resample(AudioResampler* resampler, AudioRingBuffe
 		result.frames_consumed++;
 	}
 
+done:
 	// Save state for next call
 	resampler->frac_pos = frac_pos;
 	resampler->prev_frame = prev;

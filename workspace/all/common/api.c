@@ -38,7 +38,8 @@
 #include <msettings.h>
 
 #include "api.h"
-#include "audio_resampler.h"
+// NOLINTNEXTLINE(bugprone-suspicious-include) - Intentionally bundled to avoid makefile changes
+#include "audio_resampler.c"
 #include "defines.h"
 #include "gfx_text.h"
 #include "pad.h"
@@ -1174,16 +1175,20 @@ static void SND_audioCallback(void* userdata, uint8_t* stream, int len) { // pla
 			snd.frame_out = 0;
 	}
 
-	int zero = len > 0 && len == SAMPLES;
-	if (zero)
-		return (void)memset(out, 0, len * (sizeof(int16_t) * 2));
-	// else if (len>=5) LOG_info("%8i BUFFER UNDERRUN (%i/%i frames)\n", ms(), len,full_len);
-
-	int16_t* in = out - 1;
-	while (len > 0) {
-		*out++ = (void*)in > (void*)stream ? *--in : 0;
-		*out++ = (void*)in > (void*)stream ? *--in : 0;
-		len -= 1;
+	// Handle underrun: repeat last frame or output silence
+	if (len > 0) {
+		if (snd.frame_filled >= 0 && snd.frame_filled < (int)snd.frame_count) {
+			// Repeat last consumed frame to avoid click
+			SND_Frame last = snd.buffer[snd.frame_filled];
+			while (len > 0) {
+				*out++ = last.left;
+				*out++ = last.right;
+				len--;
+			}
+		} else {
+			// No valid last frame - output silence
+			memset(out, 0, len * sizeof(int16_t) * 2);
+		}
 	}
 }
 
@@ -1340,6 +1345,7 @@ size_t SND_batchSamples(const SND_Frame* frames,
 	    .frames = snd.buffer,
 	    .capacity = snd.frame_count,
 	    .write_pos = snd.frame_in,
+	    .read_pos = snd.frame_out,
 	};
 
 	// Resample the audio with linear interpolation
@@ -1409,6 +1415,21 @@ void SND_init(double sample_rate, double frame_rate) { // plat_sound_init
 	LOG_info("sample rate: %i (req) %i (rec) [samples %i]\n", snd.sample_rate_in,
 	         snd.sample_rate_out, SAMPLES);
 	snd.initialized = 1;
+}
+
+/**
+ * Gets current audio buffer fill level as a percentage.
+ *
+ * Used by libretro cores for audio-based frameskip decisions.
+ * Thread-safe: locks audio to read consistent buffer state.
+ *
+ * @return Fill level 0-100 (0 = empty, 100 = full)
+ */
+unsigned SND_getBufferOccupancy(void) {
+	SDL_LockAudio();
+	float fill = SND_getBufferFillLevel();
+	SDL_UnlockAudio();
+	return (unsigned)(fill * 100.0f);
 }
 
 /**

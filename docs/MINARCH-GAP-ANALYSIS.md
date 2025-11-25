@@ -113,6 +113,7 @@ The environment callback is the primary interface for core-frontend communicatio
 | 54 | `SET_CORE_OPTIONS_INTL` | ✅ Uses US locale options |
 | 55 | `SET_CORE_OPTIONS_DISPLAY` | ⚠️ Stub - no visibility control |
 | 57 | `GET_DISK_CONTROL_INTERFACE_VERSION` | ✅ Returns 1 |
+| 62 | `SET_AUDIO_BUFFER_STATUS_CALLBACK` | ✅ Full - reports buffer occupancy for frameskip |
 | 58 | `SET_DISK_CONTROL_EXT_INTERFACE` | ✅ Full extended disk control |
 | 65 | `SET_CONTENT_INFO_OVERRIDE` | ⚠️ Stub - acknowledged only |
 | 70 | `SET_VARIABLE` | ✅ Allows cores to set options |
@@ -140,7 +141,6 @@ The environment callback is the primary interface for core-frontend communicatio
 | 45 | `GET_VFS_INTERFACE` | No virtual filesystem | Cores using VFS |
 | 59 | `GET_MESSAGE_INTERFACE_VERSION` | No extended messages | Modern cores |
 | 60 | `SET_MESSAGE_EXT` | No OSD messages | Modern cores |
-| 62 | `SET_AUDIO_BUFFER_STATUS_CALLBACK` | No buffer monitoring | mGBA, Beetle cores |
 | 63 | `SET_MINIMUM_AUDIO_LATENCY` | No latency control | mGBA |
 | 69 | `SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK` | No dynamic visibility | Gambatte, fceumm |
 
@@ -183,7 +183,7 @@ The environment callback is the primary interface for core-frontend communicatio
 | Category | Implemented | Partial | Missing | Notes |
 |----------|-------------|---------|---------|-------|
 | Video | 5 | 1 | 5 | No HW rendering |
-| Audio | 3 | 2 | 2 | Basic audio complete |
+| Audio | 4 | 1 | 2 | Buffer status callback added |
 | Input | 5 | 1 | 3 | No keyboard/mouse/lightgun |
 | Core Options | 6 | 1 | 2 | No v2 categories |
 | Save States | 2 | 0 | 1 | No quirks support |
@@ -200,7 +200,7 @@ The environment callback is the primary interface for core-frontend communicatio
 | PSX HW (Beetle) | `SET_HW_RENDER` |
 | PSP (PPSSPP) | `SET_HW_RENDER`, `SET_SUBSYSTEM_INFO` |
 | Computer emulators | `SET_KEYBOARD_CALLBACK` |
-| mGBA (audio sync) | `SET_AUDIO_BUFFER_STATUS_CALLBACK`, `SET_MINIMUM_AUDIO_LATENCY` |
+| mGBA (audio sync) | `SET_MINIMUM_AUDIO_LATENCY` |
 | RetroAchievements | `SET_MEMORY_MAPS`, `SET_SUPPORT_ACHIEVEMENTS` |
 
 ---
@@ -218,11 +218,6 @@ The environment callback is the primary interface for core-frontend communicatio
    - Enables on-screen notifications from cores
    - Implementation: Add OSD text rendering, message queue
    - Effort: Medium
-
-3. **SET_AUDIO_BUFFER_STATUS_CALLBACK (62)**
-   - Helps cores like mGBA avoid audio crackling
-   - Implementation: Track buffer fill level, call callback
-   - Effort: Low
 
 ### Medium Priority (Core Compatibility)
 
@@ -270,16 +265,15 @@ The environment callback is the primary interface for core-frontend communicatio
 
 ```
 Total Environment Commands: ~80
-Implemented (Full):         31 (39%)
+Implemented (Full):         32 (40%)
 Implemented (Partial):       6 (7%)
-Not Implemented:           ~43 (54%)
+Not Implemented:           ~42 (53%)
 ```
 
 MinArch implements the core functionality needed for most retro gaming scenarios. The primary gaps are:
 1. Hardware rendering (by design)
 2. Modern core options (v2)
 3. On-screen messages
-4. Audio buffer monitoring
-5. Achievement support
+4. Achievement support
 
 For MinArch's target use case (handheld retro gaming with software rendering), the current implementation covers the essential libretro features. The recommended improvements focus on better core compatibility rather than adding fundamentally new capabilities.

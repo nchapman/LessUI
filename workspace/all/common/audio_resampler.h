@@ -13,7 +13,7 @@
 #ifndef __AUDIO_RESAMPLER_H__
 #define __AUDIO_RESAMPLER_H__
 
-#include <stdint.h>
+#include "api_types.h" // SND_Frame
 
 /**
  * Fixed-point format: 16.16 (16 bits integer, 16 bits fraction)
@@ -24,20 +24,13 @@
 #define FRAC_MASK (FRAC_ONE - 1)
 
 /**
- * Stereo audio frame (left/right channels)
- */
-typedef struct SND_Frame {
-	int16_t left;
-	int16_t right;
-} SND_Frame;
-
-/**
  * Ring buffer abstraction for audio resampling
  */
 typedef struct AudioRingBuffer {
 	SND_Frame* frames; // Buffer array
 	int capacity; // Total buffer size
 	int write_pos; // Current write position
+	int read_pos; // Current read position (for overflow detection)
 } AudioRingBuffer;
 
 /**
