@@ -4027,21 +4027,46 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 		if (scale == -1)
 			scale = 1; // nearest neighbor flag
 
-		// blitBitmapText expects pitch in pixels (uint16_t), not bytes
-		int pitch_in_pixels = rgb565_pitch / sizeof(uint16_t);
+		// Debug text rendering needs correct buffer dimensions and pitch.
+		// blitBitmapText expects pitch in pixels (uint16_t), not bytes.
+		//
+		// After 90°/270° rotation, the buffer dimensions are swapped (width becomes height
+		// and vice versa) because the image has been rotated. We detect this by checking if
+		// rotated_data != frame_data (indicating rotation was actually applied).
+		//
+		// blitBitmapText needs the post-rotation dimensions to correctly bounds-check text
+		// rendering, and the rotation buffer's pitch instead of the original pitch.
+		int pitch_in_pixels;
+		int debug_width = width;
+		int debug_height = height;
+
+		if (rotated_data != frame_data &&
+		    (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270)) {
+			// Use swapped dimensions and rotation buffer pitch for 90°/270° rotations
+			debug_width = height;
+			debug_height = width;
+			pitch_in_pixels = rotation_buffer.pitch / sizeof(uint16_t);
+		} else {
+			// Use original dimensions and pitch for 0°/180° or when rotation was skipped
+			pitch_in_pixels = rgb565_pitch / sizeof(uint16_t);
+		}
 
 		sprintf(debug_text, "%ix%i %ix", renderer.src_w, renderer.src_h, scale);
-		blitBitmapText(debug_text, x, y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, x, y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 
 		sprintf(debug_text, "%i,%i %ix%i", renderer.dst_x, renderer.dst_y, renderer.src_w * scale,
 		        renderer.src_h * scale);
-		blitBitmapText(debug_text, -x, y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, -x, y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 
 		sprintf(debug_text, "%.01f/%.01f %i%%", fps_double, cpu_double, (int)use_double);
-		blitBitmapText(debug_text, x, -y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, x, -y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 
 		sprintf(debug_text, "%ix%i", renderer.dst_w, renderer.dst_h);
-		blitBitmapText(debug_text, -x, -y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, -x, -y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 	}
 	renderer.dst = screen->pixels;
 	// LOG_info("video_refresh_callback: %ix%i@%i %ix%i@%i",width,height,pitch,screen->w,screen->h,screen->pitch);

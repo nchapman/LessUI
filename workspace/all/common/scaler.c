@@ -4269,4 +4269,3 @@ void rotate_c16(unsigned rotation, void* __restrict src, void* __restrict dst, u
 		break;
 	}
 }
-
