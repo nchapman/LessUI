@@ -45,6 +45,7 @@
 #include <string.h>
 
 #include "platform.h" // for HAS_NEON
+#include "scaler.h" // for function declarations and ROTATION_ constants
 
 /**
  * No-op scaler function (unused placeholder).
@@ -4190,3 +4191,82 @@ void scale3x_grid(void* __restrict src, void* __restrict dst, uint32_t sw, uint3
 		}
 	}
 }
+///////////////////////////////
+// Rotation implementations
+///////////////////////////////
+
+/**
+ * C implementation of RGB565 rotation.
+ *
+ * Algorithm:
+ * - 0°:   memcpy rows (or no-op if src==dst)
+ * - 90°:  dst[y,x] = src[w-1-x, y]
+ * - 180°: dst[y,x] = src[h-1-y, w-1-x]
+ * - 270°: dst[y,x] = src[x, h-1-y]
+ */
+void rotate_c16(unsigned rotation, void* __restrict src, void* __restrict dst, uint32_t src_w,
+                uint32_t src_h, uint32_t src_p, uint32_t dst_p) {
+	uint16_t* src_pixels = (uint16_t*)src;
+	uint16_t* dst_pixels = (uint16_t*)dst;
+
+	// Auto-calculate pitches if not specified
+	if (src_p == 0)
+		src_p = src_w * sizeof(uint16_t);
+	if (dst_p == 0) {
+		if (rotation == ROTATION_90 || rotation == ROTATION_270)
+			dst_p = src_h * sizeof(uint16_t); // Swapped dimensions
+		else
+			dst_p = src_w * sizeof(uint16_t);
+	}
+
+	uint32_t src_stride = src_p / sizeof(uint16_t);
+	uint32_t dst_stride = dst_p / sizeof(uint16_t);
+
+	switch (rotation) {
+	case ROTATION_0:
+		// No rotation - just copy rows
+		if (src != dst) {
+			for (uint32_t y = 0; y < src_h; y++) {
+				memcpy(dst_pixels + y * dst_stride, src_pixels + y * src_stride,
+				       src_w * sizeof(uint16_t));
+			}
+		}
+		break;
+
+	case ROTATION_90:
+		// 90° CCW: dst[y,x] = src[src_w-1-x, y]
+		// Output dimensions: src_h × src_w
+		for (uint32_t src_y = 0; src_y < src_h; src_y++) {
+			for (uint32_t src_x = 0; src_x < src_w; src_x++) {
+				uint32_t dst_x = src_y;
+				uint32_t dst_y = src_w - 1 - src_x;
+				dst_pixels[dst_y * dst_stride + dst_x] = src_pixels[src_y * src_stride + src_x];
+			}
+		}
+		break;
+
+	case ROTATION_180:
+		// 180°: dst[y,x] = src[src_h-1-y, src_w-1-x]
+		for (uint32_t src_y = 0; src_y < src_h; src_y++) {
+			for (uint32_t src_x = 0; src_x < src_w; src_x++) {
+				uint32_t dst_x = src_w - 1 - src_x;
+				uint32_t dst_y = src_h - 1 - src_y;
+				dst_pixels[dst_y * dst_stride + dst_x] = src_pixels[src_y * src_stride + src_x];
+			}
+		}
+		break;
+
+	case ROTATION_270:
+		// 270° CCW (90° CW): dst[y,x] = src[x, src_h-1-y]
+		// Output dimensions: src_h × src_w
+		for (uint32_t src_y = 0; src_y < src_h; src_y++) {
+			for (uint32_t src_x = 0; src_x < src_w; src_x++) {
+				uint32_t dst_x = src_h - 1 - src_y;
+				uint32_t dst_y = src_x;
+				dst_pixels[dst_y * dst_stride + dst_x] = src_pixels[src_y * src_stride + src_x];
+			}
+		}
+		break;
+	}
+}
+

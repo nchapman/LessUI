@@ -158,6 +158,15 @@ static int DEVICE_PITCH = 0; // Screen pitch in bytes
 
 GFX_Renderer renderer; // Platform-specific renderer handle
 
+// Rotation buffer for software rotation
+static struct {
+	void* buffer; // Rotation output buffer (RGB565)
+	size_t size; // Current buffer size in bytes
+	uint32_t width; // Buffer width in pixels
+	uint32_t height; // Buffer height in pixels
+	uint32_t pitch; // Buffer pitch in bytes
+} rotation_buffer = {NULL, 0, 0, 0, 0};
+
 ///////////////////////////////////////
 // Libretro Core Interface
 ///////////////////////////////////////
@@ -2595,8 +2604,13 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 			return false;
 		}
 
-		// Store rotation state but don't apply (platform-specific handling)
+		// Store rotation state and log it
 		video_state.rotation = *rotation;
+		LOG_info("SET_ROTATION: %u (%s)", *rotation,
+		         *rotation == 0   ? "0° (normal)"
+		         : *rotation == 1 ? "90° CCW"
+		         : *rotation == 2 ? "180°"
+		                          : "270° CCW");
 		break;
 	}
 	case RETRO_ENVIRONMENT_GET_OVERSCAN: { /* 2 */
@@ -3548,6 +3562,95 @@ static void buffer_downsample(const void* data, unsigned width, unsigned height,
 }
 
 /**
+ * Allocate or resize rotation buffer.
+ *
+ * @param width Buffer width in pixels
+ * @param height Buffer height in pixels
+ * @param pitch Buffer pitch in bytes
+ */
+static void rotation_buffer_alloc(uint32_t width, uint32_t height, uint32_t pitch) {
+	if (pitch == 0)
+		pitch = width * sizeof(uint16_t);
+
+	size_t required_size = pitch * height;
+
+	// Realloc only if size increased
+	if (required_size > rotation_buffer.size) {
+		void* new_buffer = realloc(rotation_buffer.buffer, required_size);
+		if (!new_buffer) {
+			LOG_error("Failed to allocate rotation buffer: %zu bytes", required_size);
+			return;
+		}
+		rotation_buffer.buffer = new_buffer;
+		rotation_buffer.size = required_size;
+		LOG_info("Allocated rotation buffer: %ux%u pitch=%u (%zu bytes)", width, height, pitch,
+		         required_size);
+	}
+
+	rotation_buffer.width = width;
+	rotation_buffer.height = height;
+	rotation_buffer.pitch = pitch;
+}
+
+/**
+ * Free rotation buffer.
+ */
+static void rotation_buffer_free(void) {
+	if (rotation_buffer.buffer) {
+		free(rotation_buffer.buffer);
+		rotation_buffer.buffer = NULL;
+		rotation_buffer.size = 0;
+		rotation_buffer.width = 0;
+		rotation_buffer.height = 0;
+		rotation_buffer.pitch = 0;
+	}
+}
+
+/**
+ * Apply software rotation to frame.
+ *
+ * @param src Source frame (RGB565)
+ * @param src_w Source width
+ * @param src_h Source height
+ * @param src_p Source pitch
+ * @return Pointer to rotated frame (rotation_buffer.buffer), or src if rotation=0
+ */
+static void* apply_rotation(void* src, uint32_t src_w, uint32_t src_h, uint32_t src_p) {
+	unsigned rotation = video_state.rotation;
+
+	// Fast path: no rotation
+	if (rotation == ROTATION_0)
+		return src;
+
+	// Calculate rotated dimensions
+	uint32_t dst_w, dst_h, dst_p;
+	if (rotation == ROTATION_90 || rotation == ROTATION_270) {
+		dst_w = src_h; // Swap dimensions
+		dst_h = src_w;
+	} else {
+		dst_w = src_w;
+		dst_h = src_h;
+	}
+	dst_p = dst_w * sizeof(uint16_t);
+
+	LOG_debug("apply_rotation: rot=%u, src=%ux%u (pitch=%u) -> dst=%ux%u (pitch=%u)", rotation,
+	          src_w, src_h, src_p, dst_w, dst_h, dst_p);
+
+	// Allocate rotation buffer if needed
+	rotation_buffer_alloc(dst_w, dst_h, dst_p);
+
+	if (!rotation_buffer.buffer) {
+		LOG_error("Rotation buffer allocation failed, skipping rotation");
+		return src;
+	}
+
+	// Perform rotation
+	rotate_c16(rotation, src, rotation_buffer.buffer, src_w, src_h, src_p, dst_p);
+
+	return rotation_buffer.buffer;
+}
+
+/**
  * Selects and configures the appropriate video scaler.
  *
  * Determines how to scale the core's output resolution to the device screen.
@@ -3571,16 +3674,28 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	if (downsample)
 		buffer_realloc(src_w, src_h, src_p);
 
+	// ROTATION: Swap dimensions for 90°/270° rotations BEFORE scaling calculations
+	// Note: core.aspect_ratio is already for the ROTATED dimensions, so don't invert it
+	double rotated_aspect = core.aspect_ratio;
+
+	if (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270) {
+		// Swap width ↔ height for rotated display
+		int temp = src_w;
+		src_w = src_h;
+		src_h = temp;
+		// Keep aspect ratio as-is (it's already for rotated dimensions)
+	}
+
 	int src_x, src_y, dst_x, dst_y, dst_w, dst_h, dst_p, scale;
 	double aspect;
 
 	int aspect_w = src_w;
-	int aspect_h = CEIL_DIV(aspect_w, core.aspect_ratio);
+	int aspect_h = CEIL_DIV(aspect_w, rotated_aspect);
 
 	// TODO: make sure this doesn't break fit==1 devices
 	if (aspect_h < src_h) {
 		aspect_h = src_h;
-		aspect_w = aspect_h * core.aspect_ratio;
+		aspect_w = aspect_h * rotated_aspect;
 		aspect_w += aspect_w % 2;
 	}
 
@@ -3591,7 +3706,7 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	dst_x = 0;
 	dst_y = 0;
 
-	// unmodified by crop
+	// unmodified by crop (reflects ROTATED dimensions after swap above)
 	renderer.true_w = src_w;
 	renderer.true_h = src_h;
 
@@ -3779,7 +3894,7 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	renderer.scale = scale;
 	renderer.aspect = (scaling == SCALE_NATIVE || scaling == SCALE_CROPPED)
 	                      ? 0
-	                      : (scaling == SCALE_FULLSCREEN ? -1 : core.aspect_ratio);
+	                      : (scaling == SCALE_FULLSCREEN ? -1 : rotated_aspect);
 	LOG_debug("Scaler: %dx%d->%dx%d, scale=%d, aspect=%.2f", src_w, src_h, dst_w, dst_h, scale,
 	          renderer.aspect);
 	renderer.blit = GFX_getScaler(&renderer);
@@ -3852,16 +3967,30 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 
 	// if source has changed size (or forced by dst_p==0)
 	// eg. true src + cropped src + fixed dst + cropped dst
-	if (renderer.dst_p == 0 || (int)width != renderer.true_w || (int)height != renderer.true_h) {
-		if ((int)width != renderer.true_w || (int)height != renderer.true_h) {
-			LOG_debug("Video dimensions changed: %dx%d -> %ux%u", renderer.true_w, renderer.true_h,
-			          width, height);
+	// Note: renderer.true_w/true_h hold ROTATED dimensions, so we need to compare carefully
+	int expected_w = renderer.true_w;
+	int expected_h = renderer.true_h;
+
+	// Un-swap dimensions if rotation is active to compare against core output
+	if (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270) {
+		int temp = expected_w;
+		expected_w = expected_h;
+		expected_h = temp;
+	}
+
+	if (renderer.dst_p == 0 || (int)width != expected_w || (int)height != expected_h) {
+		if ((int)width != expected_w || (int)height != expected_h) {
+			LOG_debug("Video dimensions changed: %dx%d -> %ux%u", expected_w, expected_h, width,
+			          height);
 		}
 		selectScaler(width, height, rgb565_pitch);
 		GFX_clearAll();
 	}
 
 	// Perform pixel format conversion if needed (after buffer is allocated)
+	void* frame_data;
+	size_t frame_pitch;
+
 	if (downsample) {
 		// Validate pitch before attempting conversion
 		size_t min_pitch = width * sizeof(uint32_t);
@@ -3871,10 +4000,23 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 		}
 
 		buffer_downsample(data, width, height, pitch);
-		renderer.src = buffer;
+		frame_data = buffer;
+		frame_pitch = rgb565_pitch;
 	} else {
-		renderer.src = (void*)data;
+		frame_data = (void*)data;
+		frame_pitch = rgb565_pitch;
 	}
+
+	// Apply software rotation if needed
+	void* rotated_data = apply_rotation(frame_data, width, height, frame_pitch);
+
+	// Update pitch in renderer if dimensions were swapped by rotation
+	if (rotated_data != frame_data &&
+	    (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270)) {
+		renderer.src_p = rotation_buffer.pitch;
+	}
+
+	renderer.src = rotated_data;
 
 	// debug - render after downsample so we write to RGB565 buffer
 	if (show_debug) {
@@ -4210,6 +4352,9 @@ void Core_quit(void) {
 	}
 }
 void Core_close(void) {
+	// Free rotation buffer
+	rotation_buffer_free();
+
 	if (core.handle)
 		dlclose(core.handle);
 }
