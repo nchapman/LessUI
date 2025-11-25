@@ -83,6 +83,21 @@ static SDL_Surface* backbuffer = NULL; // Double-buffer for threaded rendering
 // Forward declaration
 static void* coreThread(void* arg);
 
+// Video geometry state for dynamic updates
+static struct {
+	unsigned rotation; // 0=0°, 1=90°, 2=180°, 3=270°
+	int geometry_changed; // Flag for SET_GEOMETRY
+	int av_info_changed; // Flag for SET_SYSTEM_AV_INFO
+	retro_frame_time_callback_t frame_time_cb; // Frame timing callback
+	retro_usec_t frame_time_ref; // Reference frame time in microseconds
+	retro_usec_t frame_time_last; // Last frame timestamp for delta calculation
+} video_state = {.rotation = 0,
+                 .geometry_changed = 0,
+                 .av_info_changed = 0,
+                 .frame_time_cb = NULL,
+                 .frame_time_ref = 0,
+                 .frame_time_last = 0};
+
 ///////////////////////////////////////
 // Video Scaling Modes
 ///////////////////////////////////////
@@ -144,6 +159,15 @@ static int DEVICE_HEIGHT = 0; // Screen height in pixels
 static int DEVICE_PITCH = 0; // Screen pitch in bytes
 
 GFX_Renderer renderer; // Platform-specific renderer handle
+
+// Rotation buffer for software rotation
+static struct {
+	void* buffer; // Rotation output buffer (RGB565)
+	size_t size; // Current buffer size in bytes
+	uint32_t width; // Buffer width in pixels
+	uint32_t height; // Buffer height in pixels
+	uint32_t pitch; // Buffer pitch in bytes
+} rotation_buffer = {NULL, 0, 0, 0, 0};
 
 ///////////////////////////////////////
 // Libretro Core Interface
@@ -2570,10 +2594,27 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	// LOG_info("environment_callback: %i", cmd);
 
 	switch (cmd) {
-	// case RETRO_ENVIRONMENT_SET_ROTATION: { /* 1 */
-	// 	LOG_info("RETRO_ENVIRONMENT_SET_ROTATION %i", *(int *)data); // core requests frontend to handle rotation
-	// 	break;
-	// }
+	case RETRO_ENVIRONMENT_SET_ROTATION: { /* 1 */
+		const unsigned* rotation = (const unsigned*)data;
+		if (!rotation) {
+			LOG_error("SET_ROTATION called with NULL data");
+			return false;
+		}
+
+		if (*rotation > 3) {
+			LOG_error("SET_ROTATION invalid value: %u (must be 0-3)", *rotation);
+			return false;
+		}
+
+		// Store rotation state and log it
+		video_state.rotation = *rotation;
+		LOG_info("SET_ROTATION: %u (%s)", *rotation,
+		         *rotation == 0   ? "0° (normal)"
+		         : *rotation == 1 ? "90° CCW"
+		         : *rotation == 2 ? "180°"
+		                          : "270° CCW");
+		break;
+	}
 	case RETRO_ENVIRONMENT_GET_OVERSCAN: { /* 2 */
 		bool* out = (bool*)data;
 		if (out)
@@ -2673,7 +2714,22 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK: { /* 21 */
-		// LOG_info("%i: RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK", cmd);
+		const struct retro_frame_time_callback* cb = (const struct retro_frame_time_callback*)data;
+		if (!cb) {
+			LOG_error("SET_FRAME_TIME_CALLBACK called with NULL data");
+			return false;
+		}
+
+		if (!cb->callback) {
+			// NULL callback = unregister
+			video_state.frame_time_cb = NULL;
+			video_state.frame_time_ref = 0;
+			video_state.frame_time_last = 0;
+			break;
+		}
+
+		video_state.frame_time_cb = cb->callback;
+		video_state.frame_time_ref = cb->reference;
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK: { /* 22 */
@@ -2705,6 +2761,40 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 			*out = core.saves_dir; // save_dir;
 		break;
 	}
+	case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: { /* 32 */
+		const struct retro_system_av_info* av_info = (const struct retro_system_av_info*)data;
+		if (!av_info) {
+			LOG_error("SET_SYSTEM_AV_INFO called with NULL data");
+			return false;
+		}
+
+		LOG_debug("SET_SYSTEM_AV_INFO: %ux%u @ %.2f fps, %.0f Hz", av_info->geometry.base_width,
+		          av_info->geometry.base_height, av_info->timing.fps, av_info->timing.sample_rate);
+
+		// Update geometry
+		if (av_info->geometry.aspect_ratio > 0.0) {
+			core.aspect_ratio = av_info->geometry.aspect_ratio;
+		} else {
+			core.aspect_ratio =
+			    (double)av_info->geometry.base_width / av_info->geometry.base_height;
+		}
+
+		// Update timing
+		double old_sample_rate = core.sample_rate;
+		core.fps = av_info->timing.fps;
+		core.sample_rate = av_info->timing.sample_rate;
+
+		// Reinitialize audio if sample rate changed
+		if (old_sample_rate != core.sample_rate) {
+			SND_quit();
+			SND_init(core.sample_rate, core.fps);
+		}
+
+		// Force scaler recalculation
+		renderer.dst_p = 0;
+		video_state.av_info_changed = 1;
+		return true;
+	}
 	case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: { /* 35 */
 		// LOG_info("RETRO_ENVIRONMENT_SET_CONTROLLER_INFO");
 		const struct retro_controller_info* infos = (const struct retro_controller_info*)data;
@@ -2723,6 +2813,26 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 		}
 		return false; // TODO: tmp
 		break;
+	}
+	case RETRO_ENVIRONMENT_SET_GEOMETRY: { /* 37 */
+		const struct retro_game_geometry* geometry = (const struct retro_game_geometry*)data;
+		if (!geometry) {
+			LOG_error("SET_GEOMETRY called with NULL data");
+			return false;
+		}
+
+		LOG_debug("SET_GEOMETRY: %ux%u aspect: %.3f", geometry->base_width, geometry->base_height,
+		          geometry->aspect_ratio);
+
+		// NOTE: Do NOT update core.aspect_ratio here!
+		// SET_GEOMETRY reports "display" dimensions which may differ from actual
+		// video_refresh frame dimensions (e.g. Stella reports 320 but sends 160).
+		// Aspect ratio should only be updated via SET_SYSTEM_AV_INFO.
+
+		// Force scaler recalculation on next video_refresh
+		renderer.dst_p = 0;
+		video_state.geometry_changed = 1;
+		return true;
 	}
 	// RETRO_ENVIRONMENT_SET_MEMORY_MAPS (36 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_LANGUAGE 39
@@ -2747,6 +2857,22 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	// RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS (42 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_VFS_INTERFACE (45 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE (47 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+	case RETRO_ENVIRONMENT_GET_FASTFORWARDING: { /* 49 */
+		bool* out = (bool*)data;
+		if (out) {
+			*out = fast_forward;
+			return true;
+		}
+		return false;
+	}
+	case RETRO_ENVIRONMENT_GET_TARGET_REFRESH_RATE: { /* 50 | RETRO_ENVIRONMENT_EXPERIMENTAL */
+		float* out = (float*)data;
+		if (out) {
+			*out = (float)core.fps;
+			return true;
+		}
+		return false;
+	}
 	// RETRO_ENVIRONMENT_GET_INPUT_BITMASKS (51 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS: { /* 51 | RETRO_ENVIRONMENT_EXPERIMENTAL */
 		bool* out = (bool*)data;
@@ -2853,6 +2979,26 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 			*out = 1;
 
 		break;
+	}
+	case RETRO_ENVIRONMENT_GET_THROTTLE_STATE: { /* 71 | RETRO_ENVIRONMENT_EXPERIMENTAL */
+		struct retro_throttle_state* state = (struct retro_throttle_state*)data;
+		if (!state) {
+			return false;
+		}
+
+		// Determine current throttle mode
+		if (fast_forward) {
+			state->mode = RETRO_THROTTLE_FAST_FORWARD;
+			state->rate = (float)(max_ff_speed + 1); // max_ff_speed+1: 0→1x, 1→2x, 2→3x, 3→4x
+		} else if (prevent_tearing) {
+			state->mode = RETRO_THROTTLE_VSYNC;
+			state->rate = 1.0f;
+		} else {
+			state->mode = RETRO_THROTTLE_UNBLOCKED;
+			state->rate = 1.0f;
+		}
+
+		return true;
 	}
 
 		// unused
@@ -3419,6 +3565,99 @@ static void buffer_downsample(const void* data, unsigned width, unsigned height,
 }
 
 /**
+ * Allocate or resize rotation buffer.
+ *
+ * @param width Buffer width in pixels
+ * @param height Buffer height in pixels
+ * @param pitch Buffer pitch in bytes
+ */
+static void rotation_buffer_alloc(uint32_t width, uint32_t height, uint32_t pitch) {
+	if (pitch == 0)
+		pitch = width * sizeof(uint16_t);
+
+	size_t required_size = pitch * height;
+
+	// Realloc only if size increased
+	if (required_size > rotation_buffer.size) {
+		void* new_buffer = realloc(rotation_buffer.buffer, required_size);
+		if (!new_buffer) {
+			LOG_error("Failed to allocate rotation buffer: %zu bytes", required_size);
+			return;
+		}
+		rotation_buffer.buffer = new_buffer;
+		rotation_buffer.size = required_size;
+		LOG_info("Allocated rotation buffer: %ux%u pitch=%u (%zu bytes)", width, height, pitch,
+		         required_size);
+	}
+
+	rotation_buffer.width = width;
+	rotation_buffer.height = height;
+	rotation_buffer.pitch = pitch;
+}
+
+/**
+ * Free rotation buffer.
+ */
+static void rotation_buffer_free(void) {
+	if (rotation_buffer.buffer) {
+		free(rotation_buffer.buffer);
+		rotation_buffer.buffer = NULL;
+		rotation_buffer.size = 0;
+		rotation_buffer.width = 0;
+		rotation_buffer.height = 0;
+		rotation_buffer.pitch = 0;
+	}
+}
+
+/**
+ * Apply software rotation to frame.
+ *
+ * @param src Source frame (RGB565)
+ * @param src_w Source width
+ * @param src_h Source height
+ * @param src_p Source pitch
+ * @return Pointer to rotated frame (rotation_buffer.buffer), or src if rotation=0
+ */
+static void* apply_rotation(void* src, uint32_t src_w, uint32_t src_h, uint32_t src_p) {
+	unsigned rotation = video_state.rotation;
+
+	// Fast path: no rotation
+	if (rotation == ROTATION_0)
+		return src;
+
+	// Calculate rotated dimensions
+	uint32_t dst_w, dst_h, dst_p;
+	if (rotation == ROTATION_90 || rotation == ROTATION_270) {
+		dst_w = src_h; // Swap dimensions
+		dst_h = src_w;
+	} else {
+		dst_w = src_w;
+		dst_h = src_h;
+	}
+	dst_p = dst_w * sizeof(uint16_t);
+
+	LOG_debug("apply_rotation: rot=%u, src=%ux%u (pitch=%u) -> dst=%ux%u (pitch=%u)", rotation,
+	          src_w, src_h, src_p, dst_w, dst_h, dst_p);
+
+	// Allocate rotation buffer if needed
+	rotation_buffer_alloc(dst_w, dst_h, dst_p);
+
+	if (!rotation_buffer.buffer) {
+		LOG_error("Rotation buffer allocation failed, skipping rotation");
+		return src;
+	}
+
+	// Perform rotation (use NEON-optimized version when available)
+#ifdef HAS_NEON
+	rotate_n16(rotation, src, rotation_buffer.buffer, src_w, src_h, src_p, dst_p);
+#else
+	rotate_c16(rotation, src, rotation_buffer.buffer, src_w, src_h, src_p, dst_p);
+#endif
+
+	return rotation_buffer.buffer;
+}
+
+/**
  * Selects and configures the appropriate video scaler.
  *
  * Determines how to scale the core's output resolution to the device screen.
@@ -3442,16 +3681,28 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	if (downsample)
 		buffer_realloc(src_w, src_h, src_p);
 
+	// ROTATION: Swap dimensions for 90°/270° rotations BEFORE scaling calculations
+	// Note: core.aspect_ratio is already for the ROTATED dimensions, so don't invert it
+	double rotated_aspect = core.aspect_ratio;
+
+	if (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270) {
+		// Swap width ↔ height for rotated display
+		int temp = src_w;
+		src_w = src_h;
+		src_h = temp;
+		// Keep aspect ratio as-is (it's already for rotated dimensions)
+	}
+
 	int src_x, src_y, dst_x, dst_y, dst_w, dst_h, dst_p, scale;
 	double aspect;
 
 	int aspect_w = src_w;
-	int aspect_h = CEIL_DIV(aspect_w, core.aspect_ratio);
+	int aspect_h = CEIL_DIV(aspect_w, rotated_aspect);
 
 	// TODO: make sure this doesn't break fit==1 devices
 	if (aspect_h < src_h) {
 		aspect_h = src_h;
-		aspect_w = aspect_h * core.aspect_ratio;
+		aspect_w = aspect_h * rotated_aspect;
 		aspect_w += aspect_w % 2;
 	}
 
@@ -3462,7 +3713,7 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	dst_x = 0;
 	dst_y = 0;
 
-	// unmodified by crop
+	// unmodified by crop (reflects ROTATED dimensions after swap above)
 	renderer.true_w = src_w;
 	renderer.true_h = src_h;
 
@@ -3650,7 +3901,7 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	renderer.scale = scale;
 	renderer.aspect = (scaling == SCALE_NATIVE || scaling == SCALE_CROPPED)
 	                      ? 0
-	                      : (scaling == SCALE_FULLSCREEN ? -1 : core.aspect_ratio);
+	                      : (scaling == SCALE_FULLSCREEN ? -1 : rotated_aspect);
 	LOG_debug("Scaler: %dx%d->%dx%d, scale=%d, aspect=%.2f", src_w, src_h, dst_w, dst_h, scale,
 	          renderer.aspect);
 	renderer.blit = GFX_getScaler(&renderer);
@@ -3723,18 +3974,56 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 
 	// if source has changed size (or forced by dst_p==0)
 	// eg. true src + cropped src + fixed dst + cropped dst
-	if (renderer.dst_p == 0 || (int)width != renderer.true_w || (int)height != renderer.true_h) {
+	// Note: renderer.true_w/true_h hold ROTATED dimensions, so we need to compare carefully
+	int expected_w = renderer.true_w;
+	int expected_h = renderer.true_h;
+
+	// Un-swap dimensions if rotation is active to compare against core output
+	if (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270) {
+		int temp = expected_w;
+		expected_w = expected_h;
+		expected_h = temp;
+	}
+
+	if (renderer.dst_p == 0 || (int)width != expected_w || (int)height != expected_h) {
+		if ((int)width != expected_w || (int)height != expected_h) {
+			LOG_debug("Video dimensions changed: %dx%d -> %ux%u", expected_w, expected_h, width,
+			          height);
+		}
 		selectScaler(width, height, rgb565_pitch);
 		GFX_clearAll();
 	}
 
 	// Perform pixel format conversion if needed (after buffer is allocated)
+	void* frame_data;
+	size_t frame_pitch;
+
 	if (downsample) {
+		// Validate pitch before attempting conversion
+		size_t min_pitch = width * sizeof(uint32_t);
+		if (pitch < min_pitch) {
+			LOG_error("Skipping frame due to invalid pitch: %zu < %zu", pitch, min_pitch);
+			return; // Abort entire frame to prevent rendering corrupted data
+		}
+
 		buffer_downsample(data, width, height, pitch);
-		renderer.src = buffer;
+		frame_data = buffer;
+		frame_pitch = rgb565_pitch;
 	} else {
-		renderer.src = (void*)data;
+		frame_data = (void*)data;
+		frame_pitch = rgb565_pitch;
 	}
+
+	// Apply software rotation if needed
+	void* rotated_data = apply_rotation(frame_data, width, height, frame_pitch);
+
+	// Update pitch in renderer if rotation was applied
+	// The rotation buffer always uses tightly-packed pitch regardless of rotation angle
+	if (rotated_data != frame_data) {
+		renderer.src_p = rotation_buffer.pitch;
+	}
+
+	renderer.src = rotated_data;
 
 	// debug - render after downsample so we write to RGB565 buffer
 	if (show_debug) {
@@ -3745,21 +4034,48 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 		if (scale == -1)
 			scale = 1; // nearest neighbor flag
 
-		// blitBitmapText expects pitch in pixels (uint16_t), not bytes
-		int pitch_in_pixels = rgb565_pitch / sizeof(uint16_t);
+		// Debug text rendering needs correct buffer dimensions and pitch.
+		// blitBitmapText expects pitch in pixels (uint16_t), not bytes.
+		//
+		// After 90°/270° rotation, the buffer dimensions are swapped (width becomes height
+		// and vice versa) because the image has been rotated. We detect this by checking if
+		// rotated_data != frame_data (indicating rotation was actually applied).
+		//
+		// blitBitmapText needs the post-rotation dimensions to correctly bounds-check text
+		// rendering, and the rotation buffer's pitch instead of the original pitch.
+		int pitch_in_pixels;
+		int debug_width = width;
+		int debug_height = height;
+
+		if (rotated_data != frame_data) {
+			// Use rotation buffer pitch when rotation was applied
+			pitch_in_pixels = rotation_buffer.pitch / sizeof(uint16_t);
+			if (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270) {
+				// Swap dimensions for 90°/270° rotations
+				debug_width = height;
+				debug_height = width;
+			}
+		} else {
+			// Use original pitch when rotation was skipped
+			pitch_in_pixels = rgb565_pitch / sizeof(uint16_t);
+		}
 
 		sprintf(debug_text, "%ix%i %ix", renderer.src_w, renderer.src_h, scale);
-		blitBitmapText(debug_text, x, y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, x, y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 
 		sprintf(debug_text, "%i,%i %ix%i", renderer.dst_x, renderer.dst_y, renderer.src_w * scale,
 		        renderer.src_h * scale);
-		blitBitmapText(debug_text, -x, y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, -x, y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 
 		sprintf(debug_text, "%.01f/%.01f %i%%", fps_double, cpu_double, (int)use_double);
-		blitBitmapText(debug_text, x, -y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, x, -y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 
 		sprintf(debug_text, "%ix%i", renderer.dst_w, renderer.dst_h);
-		blitBitmapText(debug_text, -x, -y, (uint16_t*)renderer.src, pitch_in_pixels, width, height);
+		blitBitmapText(debug_text, -x, -y, (uint16_t*)renderer.src, pitch_in_pixels, debug_width,
+		               debug_height);
 	}
 	renderer.dst = screen->pixels;
 	// LOG_info("video_refresh_callback: %ix%i@%i %ix%i@%i",width,height,pitch,screen->w,screen->h,screen->pitch);
@@ -3825,6 +4141,15 @@ static void video_refresh_callback(const void* data, unsigned width, unsigned he
 
 		// Copy or convert data to backbuffer
 		if (downsample) {
+			// Validate pitch before attempting conversion
+			size_t min_pitch = width * sizeof(uint32_t);
+			if (pitch < min_pitch) {
+				LOG_error("Skipping threaded frame due to invalid pitch: %zu < %zu", pitch,
+				          min_pitch);
+				pthread_mutex_unlock(&core_mx);
+				return; // Abort frame to prevent buffer corruption
+			}
+
 			// Core provided XRGB8888, convert to tightly-packed RGB565
 			buffer_downsample(data, width, height, pitch);
 			if (!buffer) {
@@ -4061,6 +4386,9 @@ void Core_quit(void) {
 	}
 }
 void Core_close(void) {
+	// Free rotation buffer
+	rotation_buffer_free();
+
 	if (core.handle)
 		dlclose(core.handle);
 }
@@ -5927,6 +6255,25 @@ static void* coreThread(void* arg) {
 		pthread_mutex_unlock(&core_mx);
 
 		if (run) {
+			// Call frame time callback if registered (per libretro spec)
+			// Passes delta time since last frame, or reference value during fast-forward
+			if (video_state.frame_time_cb) {
+				retro_usec_t now = getMicroseconds();
+				retro_usec_t delta;
+				if (fast_forward) {
+					// During fast-forward, use the reference frame time
+					delta = video_state.frame_time_ref;
+				} else if (video_state.frame_time_last == 0) {
+					// First frame - use reference as initial delta
+					delta = video_state.frame_time_ref;
+				} else {
+					// Normal playback - calculate actual delta
+					delta = now - video_state.frame_time_last;
+				}
+				video_state.frame_time_last = now;
+				video_state.frame_time_cb(delta);
+			}
+
 			core.run();
 			limitFF();
 			trackFPS();
@@ -6057,6 +6404,25 @@ int main(int argc, char* argv[]) {
 	sec_start = SDL_GetTicks();
 	while (!quit) {
 		GFX_startFrame();
+
+		// Call frame time callback if registered (per libretro spec)
+		// Passes delta time since last frame, or reference value during fast-forward
+		if (video_state.frame_time_cb) {
+			retro_usec_t now = getMicroseconds();
+			retro_usec_t delta;
+			if (fast_forward) {
+				// During fast-forward, use the reference frame time
+				delta = video_state.frame_time_ref;
+			} else if (video_state.frame_time_last == 0) {
+				// First frame - use reference as initial delta
+				delta = video_state.frame_time_ref;
+			} else {
+				// Normal playback - calculate actual delta
+				delta = now - video_state.frame_time_last;
+			}
+			video_state.frame_time_last = now;
+			video_state.frame_time_cb(delta);
+		}
 
 		if (!thread_video) {
 			core.run();
