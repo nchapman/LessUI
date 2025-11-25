@@ -3644,8 +3644,12 @@ static void* apply_rotation(void* src, uint32_t src_w, uint32_t src_h, uint32_t 
 		return src;
 	}
 
-	// Perform rotation
+	// Perform rotation (use NEON-optimized version when available)
+#ifdef HAS_NEON
+	rotate_n16(rotation, src, rotation_buffer.buffer, src_w, src_h, src_p, dst_p);
+#else
 	rotate_c16(rotation, src, rotation_buffer.buffer, src_w, src_h, src_p, dst_p);
+#endif
 
 	return rotation_buffer.buffer;
 }

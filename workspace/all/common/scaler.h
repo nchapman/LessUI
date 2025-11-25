@@ -542,4 +542,15 @@ enum {
 void rotate_c16(unsigned rotation, void* __restrict src, void* __restrict dst, uint32_t src_w,
                 uint32_t src_h, uint32_t src_p, uint32_t dst_p);
 
+#ifdef HAS_NEON
+/**
+ * NEON-optimized RGB565 rotation using 4x4 block transpose.
+ *
+ * Same interface as rotate_c16() but uses NEON SIMD for ~3-4x speedup.
+ * Falls back to scalar code for edge pixels when dimensions not divisible by 4.
+ */
+void rotate_n16(unsigned rotation, void* __restrict src, void* __restrict dst, uint32_t src_w,
+                uint32_t src_h, uint32_t src_p, uint32_t dst_p);
+#endif
+
 #endif
