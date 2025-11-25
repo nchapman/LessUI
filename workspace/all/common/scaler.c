@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "log.h"
 #include "platform.h" // for HAS_NEON
 #include "scaler.h" // for function declarations and ROTATION_ constants
 
@@ -4266,6 +4267,11 @@ void rotate_c16(unsigned rotation, void* __restrict src, void* __restrict dst, u
 				dst_pixels[dst_y * dst_stride + dst_x] = src_pixels[src_y * src_stride + src_x];
 			}
 		}
+		break;
+
+	default:
+		// Invalid rotation value, skip rotation
+		LOG_error("rotate_c16: Invalid rotation value %u", rotation);
 		break;
 	}
 }

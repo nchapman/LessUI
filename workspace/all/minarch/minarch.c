@@ -2857,7 +2857,7 @@ static bool environment_callback(unsigned cmd, void* data) { // copied from pico
 	case RETRO_ENVIRONMENT_GET_FASTFORWARDING: { /* 49 */
 		bool* out = (bool*)data;
 		if (out) {
-			*out = fast_forward ? true : false;
+			*out = fast_forward;
 			return true;
 		}
 		return false;
@@ -4010,9 +4010,9 @@ static void video_refresh_callback_main(const void* data, unsigned width, unsign
 	// Apply software rotation if needed
 	void* rotated_data = apply_rotation(frame_data, width, height, frame_pitch);
 
-	// Update pitch in renderer if dimensions were swapped by rotation
-	if (rotated_data != frame_data &&
-	    (video_state.rotation == ROTATION_90 || video_state.rotation == ROTATION_270)) {
+	// Update pitch in renderer if rotation was applied
+	// The rotation buffer always uses tightly-packed pitch regardless of rotation angle
+	if (rotated_data != frame_data) {
 		renderer.src_p = rotation_buffer.pitch;
 	}
 
