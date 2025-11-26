@@ -56,7 +56,7 @@ atomic_system_update() {
 	# Determine which unzip to use
 	# Some platforms bundle unzip (tg5040, trimuismart, my282, rg35xxplus)
 	# Others rely on stock firmware's unzip in PATH (miyoomini, rg35xx, etc.)
-	if [ -f "./unzip" ]; then
+	if [ -x "./unzip" ]; then
 		_unzip_cmd="./unzip"
 	else
 		_unzip_cmd="unzip"
