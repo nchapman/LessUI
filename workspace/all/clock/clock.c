@@ -75,10 +75,9 @@ int main(int argc, char* argv[]) {
 		digit = TTF_RenderUTF8_Blended(font.large, c, COLOR_WHITE);
 		// Colon sits too low naturally, adjust vertically
 		int y = i == CHAR_COLON ? DP(-1.5) : 0;
-		SDL_BlitSurface(
-		    digit, NULL, digits,
-		    &(SDL_Rect){(i * DP(DIGIT_WIDTH)) + (DP(DIGIT_WIDTH) - digit->w) / 2,
-		                y + (DP(DIGIT_HEIGHT) - digit->h) / 2});
+		SDL_BlitSurface(digit, NULL, digits,
+		                &(SDL_Rect){(i * DP(DIGIT_WIDTH)) + (DP(DIGIT_WIDTH) - digit->w) / 2,
+		                            y + (DP(DIGIT_HEIGHT) - digit->h) / 2});
 		SDL_FreeSurface(digit);
 		i += 1;
 	}
@@ -111,8 +110,7 @@ int main(int argc, char* argv[]) {
 	 * @return New x position after blitting (x + digit width)
 	 */
 	int blit(int i, int x, int y) {
-		SDL_BlitSurface(digits, &(SDL_Rect){i * DP(10), 0, DP2(10, 16)}, screen,
-		                &(SDL_Rect){x, y});
+		SDL_BlitSurface(digits, &(SDL_Rect){i * DP(10), 0, DP2(10, 16)}, screen, &(SDL_Rect){x, y});
 		return x + DP(10);
 	}
 

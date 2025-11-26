@@ -1739,8 +1739,7 @@ static void openDirectory(char* path, int auto_launch) {
 	if (top) {
 		top->start = start;
 		top->end =
-		    end ? end
-		        : ((top->entries->count < ui.row_count) ? top->entries->count : ui.row_count);
+		    end ? end : ((top->entries->count < ui.row_count) ? top->entries->count : ui.row_count);
 		Array_push(stack, top);
 	}
 }
@@ -2316,8 +2315,8 @@ int main(int argc, char* argv[]) {
 						if (j == selected_row) {
 							GFX_blitPill(ASSET_WHITE_PILL, screen,
 							             &(SDL_Rect){DP(ui.padding),
-							                         DP(ui.padding + (j * ui.pill_height)), max_width,
-							                         DP(ui.pill_height)});
+							                         DP(ui.padding + (j * ui.pill_height)),
+							                         max_width, DP(ui.pill_height)});
 							text_color = COLOR_BLACK;
 						} else if (entry->unique) {
 							trimSortingMeta(&entry_unique);
@@ -2331,8 +2330,10 @@ int main(int argc, char* argv[]) {
 							    text,
 							    &(SDL_Rect){0, 0, max_width - DP(ui.button_padding * 2), text->h},
 							    screen,
-							    &(SDL_Rect){DP(ui.padding + ui.button_padding),
-							                DP(ui.padding + (j * ui.pill_height) + ui.text_baseline), 0, 0});
+							    &(SDL_Rect){
+							        DP(ui.padding + ui.button_padding),
+							        DP(ui.padding + (j * ui.pill_height) + ui.text_baseline), 0,
+							        0});
 
 							GFX_truncateText(font.large, entry_name, display_name, available_width,
 							                 DP(ui.button_padding * 2));
@@ -2340,11 +2341,11 @@ int main(int argc, char* argv[]) {
 						SDL_Surface* text =
 						    TTF_RenderUTF8_Blended(font.large, display_name, text_color);
 						SDL_BlitSurface(
-						    text,
-						    &(SDL_Rect){0, 0, max_width - DP(ui.button_padding * 2), text->h},
+						    text, &(SDL_Rect){0, 0, max_width - DP(ui.button_padding * 2), text->h},
 						    screen,
 						    &(SDL_Rect){DP(ui.padding + ui.button_padding),
-						                DP(ui.padding + (j * ui.pill_height) + ui.text_baseline), 0, 0});
+						                DP(ui.padding + (j * ui.pill_height) + ui.text_baseline), 0,
+						                0});
 						SDL_FreeSurface(text);
 					}
 				} else {

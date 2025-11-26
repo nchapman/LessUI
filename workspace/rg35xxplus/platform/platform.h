@@ -141,7 +141,9 @@ extern int on_hdmi; // Set to 1 when HDMI output is active
 // Runtime-configurable for device variants
 ///////////////////////////////
 
-#define SCREEN_DIAGONAL (is_cubexx ? 3.95f : (is_rg34xx ? 3.4f : 3.5f)) // Diagonal: 3.95" (Cube) / 3.4" (34XX) / 3.5" (Plus)
+#define SCREEN_DIAGONAL                                                                            \
+	(is_cubexx ? 3.95f                                                                             \
+	           : (is_rg34xx ? 3.4f : 3.5f)) // Diagonal: 3.95" (Cube) / 3.4" (34XX) / 3.5" (Plus)
 #define FIXED_SCALE 2 // 2x scaling factor for UI
 #define FIXED_WIDTH (is_cubexx ? 720 : (is_rg34xx ? 720 : 640)) // Width: 720 (H/SP) or 640 (Plus)
 #define FIXED_HEIGHT (is_cubexx ? 720 : 480) // Height: 720 (H) or 480 (Plus/SP)

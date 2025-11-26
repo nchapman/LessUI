@@ -68,11 +68,11 @@ extern float gfx_dp_scale;
  * to optimally fill the display without per-platform manual configuration.
  */
 typedef struct UI_Layout {
-	int pill_height;   // Height of menu pills in dp (28-32 typical)
-	int row_count;     // Number of visible menu rows (6-8)
-	int padding;       // Screen edge padding in dp
+	int pill_height; // Height of menu pills in dp (28-32 typical)
+	int row_count; // Number of visible menu rows (6-8)
+	int padding; // Screen edge padding in dp
 	int text_baseline; // Vertical offset for text centering in pill
-	int button_size;   // Size of button graphics in dp
+	int button_size; // Size of button graphics in dp
 	int button_margin; // Margin around buttons in dp
 	int button_padding; // Padding inside buttons in dp
 } UI_Layout;

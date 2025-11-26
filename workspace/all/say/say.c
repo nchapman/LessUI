@@ -59,9 +59,9 @@ int main(int argc, const char* argv[]) {
 			GFX_clear(screen);
 
 			// Display message centered, leaving room for button at bottom
-			GFX_blitMessage(
-			    font.large, msg, screen,
-			    &(SDL_Rect){0, 0, screen->w, screen->h - DP(ui.padding + ui.pill_height + ui.padding)});
+			GFX_blitMessage(font.large, msg, screen,
+			                &(SDL_Rect){0, 0, screen->w,
+			                            screen->h - DP(ui.padding + ui.pill_height + ui.padding)});
 			GFX_blitButtonGroup((char*[]){"A", "OKAY", NULL}, 1, screen, 1);
 
 			GFX_flip(screen);

@@ -3053,18 +3053,16 @@ static void MSG_init(void) {
 	int i = 0;
 	while ((c = chars[i])) {
 		digit = TTF_RenderUTF8_Blended(font.tiny, c, COLOR_WHITE);
-		SDL_BlitSurface(
-		    digit, NULL, digits,
-		    &(SDL_Rect){(i * DP(DIGIT_WIDTH)) + (DP(DIGIT_WIDTH) - digit->w) / 2,
-		                (DP(DIGIT_HEIGHT) - digit->h) / 2});
+		SDL_BlitSurface(digit, NULL, digits,
+		                &(SDL_Rect){(i * DP(DIGIT_WIDTH)) + (DP(DIGIT_WIDTH) - digit->w) / 2,
+		                            (DP(DIGIT_HEIGHT) - digit->h) / 2});
 		SDL_FreeSurface(digit);
 		i += 1;
 	}
 }
 static int MSG_blitChar(int n, int x, int y) {
 	if (n != DIGIT_SPACE)
-		SDL_BlitSurface(digits,
-		                &(SDL_Rect){n * DP(DIGIT_WIDTH), 0, DP2(DIGIT_WIDTH, DIGIT_HEIGHT)},
+		SDL_BlitSurface(digits, &(SDL_Rect){n * DP(DIGIT_WIDTH), 0, DP2(DIGIT_WIDTH, DIGIT_HEIGHT)},
 		                screen, &(SDL_Rect){x, y});
 	return x + DP(DIGIT_WIDTH + DIGIT_TRACKING);
 }
@@ -5312,9 +5310,9 @@ static int Menu_options(MenuList* list) {
 							desc = item->desc;
 					}
 					text = TTF_RenderUTF8_Blended(font.small, item->name, text_color);
-					SDL_BlitSurface(text, NULL, screen,
-					                &(SDL_Rect){ox + DP(OPTION_PADDING),
-					                            oy + DP((j * ui.button_size) + 1)});
+					SDL_BlitSurface(
+					    text, NULL, screen,
+					    &(SDL_Rect){ox + DP(OPTION_PADDING), oy + DP((j * ui.button_size) + 1)});
 					SDL_FreeSurface(text);
 				}
 			} else if (type == MENU_FIXED) {
@@ -5362,9 +5360,9 @@ static int Menu_options(MenuList* list) {
 							desc = item->desc;
 					}
 					text = TTF_RenderUTF8_Blended(font.small, item->name, text_color);
-					SDL_BlitSurface(text, NULL, screen,
-					                &(SDL_Rect){ox + DP(OPTION_PADDING),
-					                            oy + DP((j * ui.button_size) + 1)});
+					SDL_BlitSurface(
+					    text, NULL, screen,
+					    &(SDL_Rect){ox + DP(OPTION_PADDING), oy + DP((j * ui.button_size) + 1)});
 					SDL_FreeSurface(text);
 				}
 			} else if (type == MENU_VAR || type == MENU_INPUT) {
@@ -5426,9 +5424,9 @@ static int Menu_options(MenuList* list) {
 							desc = item->desc;
 					}
 					text = TTF_RenderUTF8_Blended(font.small, item->name, text_color);
-					SDL_BlitSurface(text, NULL, screen,
-					                &(SDL_Rect){ox + DP(OPTION_PADDING),
-					                            oy + DP((j * ui.button_size) + 1)});
+					SDL_BlitSurface(
+					    text, NULL, screen,
+					    &(SDL_Rect){ox + DP(OPTION_PADDING), oy + DP((j * ui.button_size) + 1)});
 					SDL_FreeSurface(text);
 
 					if (await_input && j == selected_row) {
@@ -5455,8 +5453,8 @@ static int Menu_options(MenuList* list) {
 				if (end < count)
 					GFX_blitAsset(
 					    ASSET_SCROLL_DOWN, NULL, screen,
-					    &(SDL_Rect){ox,
-					                screen->h - DP(ui.padding + ui.pill_height + ui.button_size) + oy});
+					    &(SDL_Rect){ox, screen->h -
+					                        DP(ui.padding + ui.pill_height + ui.button_size) + oy});
 			}
 
 			if (!desc && list->desc)
@@ -5963,8 +5961,9 @@ static void Menu_loop(void) {
 			GFX_blitButtonGroup((char*[]){"B", "BACK", "A", "OKAY", NULL}, 1, screen, 1);
 
 			// list
-			oy =
-			    (((DEVICE_HEIGHT / FIXED_SCALE) - ui.padding * 2) - (MENU_ITEM_COUNT * ui.pill_height)) / 2;
+			oy = (((DEVICE_HEIGHT / FIXED_SCALE) - ui.padding * 2) -
+			      (MENU_ITEM_COUNT * ui.pill_height)) /
+			     2;
 			for (int i = 0; i < MENU_ITEM_COUNT; i++) {
 				char* item = menu.items[i];
 				SDL_Color text_color = COLOR_WHITE;
@@ -5998,15 +5997,17 @@ static void Menu_loop(void) {
 					text = TTF_RenderUTF8_Blended(font.large, item, COLOR_BLACK);
 					SDL_BlitSurface(text, NULL, screen,
 					                &(SDL_Rect){DP(2 + ui.padding + ui.button_padding),
-					                            DP(1 + ui.padding + oy + (i * ui.pill_height) + ui.text_baseline)});
+					                            DP(1 + ui.padding + oy + (i * ui.pill_height) +
+					                               ui.text_baseline)});
 					SDL_FreeSurface(text);
 				}
 
 				// text
 				text = TTF_RenderUTF8_Blended(font.large, item, text_color);
-				SDL_BlitSurface(text, NULL, screen,
-				                &(SDL_Rect){DP(ui.padding + ui.button_padding),
-				                            DP(oy + ui.padding + (i * ui.pill_height) + ui.text_baseline)});
+				SDL_BlitSurface(
+				    text, NULL, screen,
+				    &(SDL_Rect){DP(ui.padding + ui.button_padding),
+				                DP(oy + ui.padding + (i * ui.pill_height) + ui.text_baseline)});
 				SDL_FreeSurface(text);
 			}
 
@@ -6054,8 +6055,7 @@ static void Menu_loop(void) {
 				oy += hh + DP(WINDOW_RADIUS);
 				for (int i = 0; i < MENU_SLOT_COUNT; i++) {
 					if (i == menu.slot)
-						GFX_blitAsset(ASSET_PAGE, NULL, screen,
-						              &(SDL_Rect){ox + DP(i * 15), oy});
+						GFX_blitAsset(ASSET_PAGE, NULL, screen, &(SDL_Rect){ox + DP(i * 15), oy});
 					else
 						GFX_blitAsset(ASSET_DOT, NULL, screen,
 						              &(SDL_Rect){ox + DP(i * 15) + 4, oy + DP(2)});

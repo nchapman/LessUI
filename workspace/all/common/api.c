@@ -76,25 +76,76 @@ UI_Layout ui = {
 };
 
 /**
- * Initializes the DP scaling system and UI layout.
+ * Initializes the resolution-independent UI scaling system.
  *
- * Calculates dp_scale from screen PPI using the formula:
- *   ppi = sqrt(width² + height²) / diagonal_inches
- *   dp_scale = ppi / 160.0
+ * Calculates dp_scale from screen PPI, snaps to favorable ratios for clean
+ * asset scaling, then determines optimal pill height to fill the screen.
  *
- * Then computes optimal pill height to perfectly fill the screen
- * with 6-8 rows of menu items.
+ * DP Scale Calculation:
+ *   1. Calculate PPI: sqrt(width² + height²) / diagonal_inches
+ *   2. Calculate raw dp_scale: ppi / 160.0 (Android MDPI baseline)
+ *   3. Snap to favorable fraction (4/3, 3/2, 5/3, etc.) for cleaner rounding
+ *   4. Apply optional SCALE_MODIFIER if defined in platform.h
+ *
+ * Row Fitting Algorithm:
+ *   - Try 8→6 rows (prefer more content)
+ *   - For each row count, calculate pill height to fill available space
+ *   - Select first configuration where pill fits 28-32dp range
+ *   - Adjust pill_height to produce even physical pixels (for centering)
+ *
+ * @param screen_width Screen width in physical pixels
+ * @param screen_height Screen height in physical pixels
+ * @param diagonal_inches Physical screen diagonal in inches (from platform.h)
+ *
+ * @note Sets global gfx_dp_scale and ui struct values
+ * @note Must be called before any DP() macro usage
  */
 void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 	// Calculate PPI and dp_scale
 	float diagonal_px = sqrtf((float)(screen_width * screen_width + screen_height * screen_height));
 	float ppi = diagonal_px / diagonal_inches;
-	gfx_dp_scale = ppi / 160.0f;
+	float raw_dp_scale = ppi / 160.0f;
 
 	// Apply platform scale modifier if defined
 #ifdef SCALE_MODIFIER
-	gfx_dp_scale *= SCALE_MODIFIER;
+	raw_dp_scale *= SCALE_MODIFIER;
 #endif
+
+	// Snap dp_scale to favorable integer ratios for cleaner asset scaling
+	// These ratios minimize rounding errors when scaling from @1x, @2x, @3x, @4x assets
+	struct {
+		int num, den;
+	} favorable_ratios[] = {
+	    {1, 1}, // 1.0   - @1x: ×1.0
+	    {4, 3}, // 1.333 - @1x: ×1.333, @2x: ×0.666
+	    {3, 2}, // 1.5   - @1x: ×1.5, @2x: ×0.75
+	    {5, 3}, // 1.666 - @2x: ×0.833
+	    {2, 1}, // 2.0   - @2x: ×1.0
+	    {5, 2}, // 2.5   - @2x: ×1.25, @3x: ×0.833
+	    {3, 1}, // 3.0   - @3x: ×1.0
+	    {4, 1} // 4.0   - @4x: ×1.0
+	};
+	int num_ratios = sizeof(favorable_ratios) / sizeof(favorable_ratios[0]);
+
+	// Find closest favorable ratio
+	int best_num = favorable_ratios[0].num;
+	int best_den = favorable_ratios[0].den;
+	float min_diff = fabsf(raw_dp_scale - (float)best_num / best_den);
+
+	for (int i = 1; i < num_ratios; i++) {
+		float ratio_val = (float)favorable_ratios[i].num / favorable_ratios[i].den;
+		float diff = fabsf(raw_dp_scale - ratio_val);
+		if (diff < min_diff) {
+			min_diff = diff;
+			best_num = favorable_ratios[i].num;
+			best_den = favorable_ratios[i].den;
+		}
+	}
+
+	gfx_dp_scale = (float)best_num / best_den;
+
+	LOG_info("UI_initLayout: raw_dp_scale=%.3f → snapped to %d/%d = %.3f (diff=%.3f)\n",
+	         raw_dp_scale, best_num, best_den, gfx_dp_scale, min_diff);
 
 	// Bounds for layout calculation
 	const int MIN_PILL = 28;
@@ -155,17 +206,17 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 	}
 
 	// Derived proportional sizes (also ensure even pixels where needed)
-	ui.button_size = (ui.pill_height * 2) / 3;  // ~20 for 30dp pill
+	ui.button_size = (ui.pill_height * 2) / 3; // ~20 for 30dp pill
 	int button_px = DP(ui.button_size);
 	if (button_px % 2 != 0)
 		ui.button_size++; // Buttons look better even
 
-	ui.button_margin = (ui.pill_height - ui.button_size) / 2;  // Center button in pill
-	ui.button_padding = (ui.pill_height * 2) / 5;              // ~12 for 30dp pill
-	ui.text_baseline = (4 * ui.pill_height + 15) / 30;         // ~4 for 30dp pill
+	ui.button_margin = (ui.pill_height - ui.button_size) / 2; // Center button in pill
+	ui.button_padding = (ui.pill_height * 2) / 5; // ~12 for 30dp pill
+	ui.text_baseline = (4 * ui.pill_height + 15) / 30; // ~4 for 30dp pill
 
-	LOG_info("UI_initLayout: %dx%d @ %.2f\" → PPI=%.0f, dp_scale=%.2f\n", screen_width, screen_height,
-	         diagonal_inches, ppi, gfx_dp_scale);
+	LOG_info("UI_initLayout: %dx%d @ %.2f\" → PPI=%.0f, dp_scale=%.2f\n", screen_width,
+	         screen_height, diagonal_inches, ppi, gfx_dp_scale);
 	LOG_info("UI_initLayout: pill=%ddp, rows=%d, padding=%ddp\n", ui.pill_height, ui.row_count,
 	         ui.padding);
 }
@@ -207,20 +258,113 @@ static struct PWR_Context {
 static int _;
 
 /**
+ * Scales a surface using bilinear interpolation.
+ *
+ * Performs smooth downscaling/upscaling of RGBA8888 or RGB888 surfaces
+ * using bilinear filtering. Each output pixel samples the 4 nearest source
+ * pixels and interpolates linearly in both X and Y directions.
+ *
+ * Used for scaling UI assets (icons, pills, buttons) from @1x/@2x/@3x/@4x
+ * tiers to the exact dp_scale required by the current screen. Provides
+ * smooth edges compared to nearest-neighbor scaling.
+ *
+ * @param src Source surface to scale
+ * @param dst Destination surface (must be pre-allocated at target size)
+ *
+ * @note Both surfaces must be locked if SDL_MUSTLOCK is true
+ * @note Works with 3-byte (RGB888) and 4-byte (RGBA8888) pixel formats
+ * @note dst dimensions determine the output scale
+ */
+static void GFX_scaleBilinear(SDL_Surface* src, SDL_Surface* dst) {
+	if (!src || !dst)
+		return;
+
+	int src_w = src->w;
+	int src_h = src->h;
+	int dst_w = dst->w;
+	int dst_h = dst->h;
+
+	// Calculate scale ratios (how much to step through source for each dest pixel)
+	float x_ratio = ((float)src_w) / dst_w;
+	float y_ratio = ((float)src_h) / dst_h;
+
+	// Determine bytes per pixel (3 for RGB, 4 for RGBA)
+	int bpp = src->format->BytesPerPixel;
+
+	// Lock surfaces if needed
+	if (SDL_MUSTLOCK(src))
+		SDL_LockSurface(src);
+	if (SDL_MUSTLOCK(dst))
+		SDL_LockSurface(dst);
+
+	uint8_t* src_pixels = (uint8_t*)src->pixels;
+	uint8_t* dst_pixels = (uint8_t*)dst->pixels;
+
+	for (int y = 0; y < dst_h; y++) {
+		for (int x = 0; x < dst_w; x++) {
+			// Source coordinates (floating point)
+			float src_x = x * x_ratio;
+			float src_y = y * y_ratio;
+
+			// Integer coordinates of surrounding pixels
+			int x1 = (int)src_x;
+			int y1 = (int)src_y;
+			int x2 = (x1 + 1 < src_w) ? x1 + 1 : x1;
+			int y2 = (y1 + 1 < src_h) ? y1 + 1 : y1;
+
+			// Fractional parts for interpolation
+			float x_frac = src_x - x1;
+			float y_frac = src_y - y1;
+
+			// Get pointers to the 4 surrounding pixels
+			uint8_t* p11 = src_pixels + (y1 * src->pitch) + (x1 * bpp);
+			uint8_t* p12 = src_pixels + (y1 * src->pitch) + (x2 * bpp);
+			uint8_t* p21 = src_pixels + (y2 * src->pitch) + (x1 * bpp);
+			uint8_t* p22 = src_pixels + (y2 * src->pitch) + (x2 * bpp);
+
+			// Bilinear interpolation for each channel
+			uint8_t* dst_pixel = dst_pixels + (y * dst->pitch) + (x * bpp);
+
+			for (int c = 0; c < bpp; c++) {
+				// Interpolate horizontally on top row
+				float top = p11[c] * (1.0f - x_frac) + p12[c] * x_frac;
+				// Interpolate horizontally on bottom row
+				float bottom = p21[c] * (1.0f - x_frac) + p22[c] * x_frac;
+				// Interpolate vertically
+				float result = top * (1.0f - y_frac) + bottom * y_frac;
+				dst_pixel[c] = (uint8_t)(result + 0.5f);
+			}
+		}
+	}
+
+	// Unlock surfaces
+	if (SDL_MUSTLOCK(dst))
+		SDL_UnlockSurface(dst);
+	if (SDL_MUSTLOCK(src))
+		SDL_UnlockSurface(src);
+}
+
+/**
  * Initializes the graphics subsystem.
  *
- * Sets up SDL video, loads UI assets, initializes fonts, and prepares
- * the color palette. This must be called before any other GFX_ functions.
+ * Sets up SDL video, initializes the DP scaling system, loads and scales
+ * UI assets, initializes fonts, and prepares the color palette.
  *
- * Asset loading:
- * - Loads platform-specific asset PNG (e.g., assets@2x.png for 2x scale)
+ * Asset Loading and Scaling:
+ * - Selects asset tier (@1x, @2x, @3x, @4x) based on ceil(dp_scale)
+ * - If exact match: uses assets as-is (e.g., dp_scale=2.0 with @2x)
+ * - If fractional: extracts and individually scales each asset using bilinear filtering
+ *   - Pill caps → exactly pill_px (for pixel-perfect GFX_blitPill rendering)
+ *   - Buttons/holes → exactly button_px
+ *   - Icons (brightness, volume, wifi) → proportional with even-pixel centering
+ *   - Battery assets → proportional scaling (internal offsets handled in GFX_blitBattery)
  * - Defines rectangles for each asset sprite in the texture atlas
  * - Maps asset IDs to RGB color values for fills
  *
- * Font initialization:
+ * Font Initialization:
  * - Opens 4 font sizes (large, medium, small, tiny)
  * - Applies bold style to all fonts
- * - Font sizes are scaled based on FIXED_SCALE
+ * - Font sizes scaled based on DP() macro (resolution-independent)
  *
  * @param mode Display mode (MODE_MAIN for launcher, MODE_MENU for in-game)
  * @return Pointer to main SDL screen surface
@@ -280,7 +424,7 @@ SDL_Surface* GFX_init(int mode) {
 	// Define asset rectangles in the loaded sprite sheet (at asset_scale)
 	// Base coordinates are @1x, multiply by asset_scale for actual position
 #define ASSET_SCALE4(x, y, w, h)                                                                   \
-	((x) *asset_scale), ((y) *asset_scale), ((w) *asset_scale), ((h) *asset_scale)
+	((x) * asset_scale), ((y) * asset_scale), ((w) * asset_scale), ((h) * asset_scale)
 
 	asset_rects[ASSET_WHITE_PILL] = (SDL_Rect){ASSET_SCALE4(1, 1, 30, 30)};
 	asset_rects[ASSET_BLACK_PILL] = (SDL_Rect){ASSET_SCALE4(33, 1, 30, 30)};
@@ -308,48 +452,97 @@ SDL_Surface* GFX_init(int mode) {
 	asset_rects[ASSET_WIFI] = (SDL_Rect){ASSET_SCALE4(95, 39, 14, 10)};
 	asset_rects[ASSET_HOLE] = (SDL_Rect){ASSET_SCALE4(1, 63, 20, 20)};
 
-	// If dp_scale doesn't match asset_scale, scale the assets
+	// Scale assets if dp_scale doesn't exactly match the loaded asset tier
+	// Uses per-asset scaling to ensure pixel-perfect pill caps and buttons
 	if (fabsf(gfx_dp_scale - (float)asset_scale) > 0.01f) {
-		// Scale down from asset_scale to dp_scale
 		float scale_ratio = gfx_dp_scale / (float)asset_scale;
-		int new_w = (int)(loaded_assets->w * scale_ratio + 0.5f);
-		int new_h = (int)(loaded_assets->h * scale_ratio + 0.5f);
-
-		// Create scaled surface with same format
-		gfx.assets = SDL_CreateRGBSurface(0, new_w, new_h, loaded_assets->format->BitsPerPixel,
-		                                  loaded_assets->format->Rmask, loaded_assets->format->Gmask,
-		                                  loaded_assets->format->Bmask, loaded_assets->format->Amask);
-
-		// Scale using SDL_BlitScaled (nearest-neighbor, sharp but correctly sized)
-		// TODO: Implement bilinear filtering for smoother edges
-		SDL_BlitScaled(loaded_assets, NULL, gfx.assets, NULL);
-		SDL_FreeSurface(loaded_assets);
-
-		// Scale asset rectangles to match the scaled surface
-		// Round dimensions to ensure even differences with pill size for perfect centering
 		int pill_px = DP(ui.pill_height);
+		int button_px = DP(ui.button_size);
+
+		// Calculate destination sheet dimensions (proportionally scaled)
+		int sheet_w = (int)(loaded_assets->w * scale_ratio + 0.5f);
+		int sheet_h = (int)(loaded_assets->h * scale_ratio + 0.5f);
+
+		// Create destination sheet (initially empty, will be filled asset-by-asset)
+		gfx.assets =
+		    SDL_CreateRGBSurface(0, sheet_w, sheet_h, loaded_assets->format->BitsPerPixel,
+		                         loaded_assets->format->Rmask, loaded_assets->format->Gmask,
+		                         loaded_assets->format->Bmask, loaded_assets->format->Amask);
+
+		// Process each asset individually to ensure exact sizing
+		// Pills/buttons get exact dimensions, other assets scale proportionally
 		for (int i = 0; i < ASSET_COUNT; i++) {
-			asset_rects[i].x = (int)(asset_rects[i].x * scale_ratio + 0.5f);
-			asset_rects[i].y = (int)(asset_rects[i].y * scale_ratio + 0.5f);
+			// Source rectangle in the @Nx sheet
+			SDL_Rect src_rect = {asset_rects[i].x, asset_rects[i].y, asset_rects[i].w,
+			                     asset_rects[i].h};
 
-			int w = (int)(asset_rects[i].w * scale_ratio + 0.5f);
-			int h = (int)(asset_rects[i].h * scale_ratio + 0.5f);
+			// Destination position (scaled proportionally)
+			SDL_Rect dst_rect = {(int)(src_rect.x * scale_ratio + 0.5f),
+			                     (int)(src_rect.y * scale_ratio + 0.5f), 0, 0};
 
-			// For standalone assets that get centered in pills, ensure even difference
-			// Skip battery family (outline, fill, bolt) - they have internal positioning dependencies
-			// Only adjust: brightness, volume, wifi
-			if (i == ASSET_BRIGHTNESS || i == ASSET_VOLUME_MUTE || i == ASSET_VOLUME ||
-			    i == ASSET_WIFI) {
-				if ((pill_px - w) % 2 != 0) w++; // Make difference even
-				if ((pill_px - h) % 2 != 0) h++; // Make difference even
+			int target_w, target_h;
+
+			// Determine target dimensions based on asset type
+			// Strategy: Pills/buttons need exact sizes (GFX_blitPill relies on perfect dimensions)
+			// Other assets (icons, battery) use proportional scaling with bilinear smoothing
+			if (i == ASSET_WHITE_PILL || i == ASSET_BLACK_PILL || i == ASSET_DARK_GRAY_PILL) {
+				// Pill caps (30×30 @1x) → exactly pill_px
+				// GFX_blitPill splits these in half for left/right caps
+				target_w = target_h = pill_px;
+			} else if (i == ASSET_BUTTON || i == ASSET_HOLE || i == ASSET_OPTION) {
+				// Buttons/holes (20×20 @1x) → exactly button_px
+				target_w = target_h = button_px;
+			} else {
+				// All other assets: proportional scaling with rounding
+				target_w = (int)(src_rect.w * scale_ratio + 0.5f);
+				target_h = (int)(src_rect.h * scale_ratio + 0.5f);
+
+				// Ensure even pixel difference from pill for perfect centering
+				// Only applies to standalone icons that get centered in pills
+				if (i == ASSET_BRIGHTNESS || i == ASSET_VOLUME_MUTE || i == ASSET_VOLUME ||
+				    i == ASSET_WIFI) {
+					if ((pill_px - target_w) % 2 != 0)
+						target_w++;
+					if ((pill_px - target_h) % 2 != 0)
+						target_h++;
+				}
+				// Battery assets (outline, fill, bolt) use proportional scaling only
+				// Their internal positioning is handled by proportional offsets in GFX_blitBattery
 			}
 
-			asset_rects[i].w = w;
-			asset_rects[i].h = h;
+			// Extract this asset region from source sheet
+			SDL_Surface* extracted =
+			    SDL_CreateRGBSurface(0, src_rect.w, src_rect.h, loaded_assets->format->BitsPerPixel,
+			                         loaded_assets->format->Rmask, loaded_assets->format->Gmask,
+			                         loaded_assets->format->Bmask, loaded_assets->format->Amask);
+			SDL_BlitSurface(loaded_assets, &src_rect, extracted, &(SDL_Rect){0, 0});
+
+			// Scale this specific asset to its target size
+			SDL_Surface* scaled =
+			    SDL_CreateRGBSurface(0, target_w, target_h, loaded_assets->format->BitsPerPixel,
+			                         loaded_assets->format->Rmask, loaded_assets->format->Gmask,
+			                         loaded_assets->format->Bmask, loaded_assets->format->Amask);
+			GFX_scaleBilinear(extracted, scaled);
+
+			// Place the scaled asset into the destination sheet
+			SDL_BlitSurface(scaled, NULL, gfx.assets, &dst_rect);
+
+			// Update asset rectangle with new position and dimensions
+			asset_rects[i] = (SDL_Rect){dst_rect.x, dst_rect.y, target_w, target_h};
+
+			// Clean up temporary surfaces for this asset
+			SDL_FreeSurface(extracted);
+			SDL_FreeSurface(scaled);
 		}
 
-		LOG_info("GFX_init: Scaled assets from @%dx to dp_scale=%.2f (nearest-neighbor)\n",
-		         asset_scale, gfx_dp_scale);
+		// Done with source sheet
+		SDL_FreeSurface(loaded_assets);
+
+		LOG_info("GFX_init: Scaled %d assets individually from @%dx to dp_scale=%.2f (bilinear)\n",
+		         ASSET_COUNT, asset_scale, gfx_dp_scale);
+		LOG_debug("  DARK_GRAY_PILL: w=%d h=%d (target pill_px=%d)\n",
+		          asset_rects[ASSET_DARK_GRAY_PILL].w, asset_rects[ASSET_DARK_GRAY_PILL].h,
+		          pill_px);
 	} else {
 		// Perfect match, use assets as-is
 		gfx.assets = loaded_assets;
@@ -897,8 +1090,8 @@ void GFX_blitBattery(SDL_Surface* dst, const SDL_Rect* dst_rect) {
 	// Battery fill/bolt offsets must scale with the actual battery asset size
 	// At @1x design: fill is 3px right, 2px down from battery top-left
 	// Scale this based on actual battery width: rect.w / 17 (17 = @1x battery width)
-	int fill_x_offset = (rect.w * 3 + 8) / 17;  // (rect.w * 3/17), rounded
-	int fill_y_offset = (rect.h * 2 + 5) / 10;  // (rect.h * 2/10), rounded
+	int fill_x_offset = (rect.w * 3 + 8) / 17; // (rect.w * 3/17), rounded
+	int fill_y_offset = (rect.h * 2 + 5) / 10; // (rect.h * 2/10), rounded
 
 	if (pwr.is_charging) {
 		if (!logged) {
@@ -1132,9 +1325,8 @@ int GFX_blitHardwareGroup(SDL_Surface* dst, int show_setting) {
 
 		float percent = ((float)(setting_value - setting_min) / (setting_max - setting_min));
 		if (show_setting == 1 || setting_value > 0) {
-			GFX_blitPill(
-			    ASSET_BAR, dst,
-			    &(SDL_Rect){ox, oy, DP(SETTINGS_WIDTH) * percent, DP(SETTINGS_SIZE)});
+			GFX_blitPill(ASSET_BAR, dst,
+			             &(SDL_Rect){ox, oy, DP(SETTINGS_WIDTH) * percent, DP(SETTINGS_SIZE)});
 		}
 	} else {
 		// TODO: handle wifi
