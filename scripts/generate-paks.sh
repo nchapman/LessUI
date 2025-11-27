@@ -2,7 +2,8 @@
 # Generate platform-specific paks from templates
 #
 # This script generates all .pak directories for all platforms from canonical templates.
-# Templates are in skeleton/TEMPLATES/paks/ and metadata in skeleton/TEMPLATES/*.json
+# - Emulator paks: skeleton/TEMPLATES/minarch-paks/
+# - Tool paks: workspace/all/paks/
 #
 # Usage:
 #   ./scripts/generate-paks.sh                    # Generate all paks for all platforms
@@ -16,6 +17,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATE_DIR="$PROJECT_ROOT/skeleton/TEMPLATES/minarch-paks"
 DIRECT_PAKS_DIR="$PROJECT_ROOT/skeleton/TEMPLATES/paks"
 BUILD_DIR="$PROJECT_ROOT/build"
+
+# Note: Tool paks (workspace/all/paks/) are handled by the Makefile system target,
+# not this script. This script only handles emulator paks and direct paks.
 
 # Check if jq is available
 if ! command -v jq &> /dev/null; then
@@ -163,8 +167,8 @@ generate_pak() {
 }
 
 # Main generation loop
-echo "Generating paks from templates..."
-echo "Template dir: $TEMPLATE_DIR"
+echo "Generating emulator paks from templates..."
+echo "Emulator template dir: $TEMPLATE_DIR"
 echo "Output dir: $BUILD_DIR"
 echo ""
 
@@ -205,4 +209,5 @@ for platform in $PLATFORMS_TO_GENERATE; do
     echo ""
 done
 
-echo "Pak generation complete!"
+echo "Emulator pak generation complete!"
+echo "(Tool paks are handled by 'make system')"

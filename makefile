@@ -151,7 +151,26 @@ system:
 	cp ./workspace/all/minarch/build/$(PLATFORM)/minarch.elf ./build/SYSTEM/$(PLATFORM)/bin/
 	cp ./workspace/all/syncsettings/build/$(PLATFORM)/syncsettings.elf ./build/SYSTEM/$(PLATFORM)/bin/
 	cp ./workspace/all/say/build/$(PLATFORM)/say.elf ./build/SYSTEM/$(PLATFORM)/bin/
-	cp ./workspace/all/clock/build/$(PLATFORM)/clock.elf ./build/EXTRAS/Tools/$(PLATFORM)/Clock.pak/
+	# Construct tool paks from workspace/all/paks/
+	# For each pak: create directory, copy launch.sh, pak.json, resources, and binary
+	@for pak_dir in ./workspace/all/paks/*/; do \
+		[ -d "$$pak_dir" ] || continue; \
+		pak_name=$$(basename "$$pak_dir"); \
+		[ -f "$$pak_dir/pak.json" ] || continue; \
+		if jq -e '.platforms | index("$(PLATFORM)") or index("all")' "$$pak_dir/pak.json" > /dev/null 2>&1; then \
+			echo "  Constructing $${pak_name}.pak for $(PLATFORM)"; \
+			output_dir="./build/EXTRAS/Tools/$(PLATFORM)/$${pak_name}.pak"; \
+			mkdir -p "$$output_dir"; \
+			[ -f "$$pak_dir/launch.sh" ] && cp "$$pak_dir/launch.sh" "$$output_dir/" && chmod +x "$$output_dir/launch.sh"; \
+			[ -f "$$pak_dir/pak.json" ] && cp "$$pak_dir/pak.json" "$$output_dir/"; \
+			[ -d "$$pak_dir/res" ] && cp -r "$$pak_dir/res" "$$output_dir/"; \
+			[ -d "$$pak_dir/bin" ] && cp -r "$$pak_dir/bin" "$$output_dir/"; \
+			[ -d "$$pak_dir/lib" ] && cp -r "$$pak_dir/lib" "$$output_dir/"; \
+			for elf in "$$pak_dir/build/$(PLATFORM)/"*.elf; do \
+				[ -f "$$elf" ] && cp "$$elf" "$$output_dir/"; \
+			done; \
+		fi \
+	done
 	cp ./workspace/all/minput/build/$(PLATFORM)/minput.elf ./build/EXTRAS/Tools/$(PLATFORM)/Input.pak/
 
 # Deploy shared libretro cores from minarch-cores GitHub releases
@@ -196,7 +215,7 @@ clean:
 	# Clean workspace/all component build directories
 	rm -rf workspace/all/minui/build
 	rm -rf workspace/all/minarch/build
-	rm -rf workspace/all/clock/build
+	rm -rf workspace/all/paks/*/build
 	rm -rf workspace/all/minput/build
 	rm -rf workspace/all/say/build
 	rm -rf workspace/all/syncsettings/build
