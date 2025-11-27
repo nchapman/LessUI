@@ -5287,7 +5287,7 @@ static int Menu_options(MenuList* list) {
 					list->max_width = mw = MIN(mw, DP(ui.screen_width - ui.padding * 2));
 				}
 
-				int ox = (DP(ui.screen_width) - mw) / 2;
+				int ox = DP_CENTER_PX(ui.screen_width, mw);
 				int oy = DP(ui.padding + ui.pill_height);
 				int selected_row = selected - start;
 				for (int i = start, j = 0; i < end; i++, j++) {
@@ -5398,7 +5398,7 @@ static int Menu_options(MenuList* list) {
 					list->max_width = mw = MIN(mw, DP(ui.screen_width - ui.padding * 2));
 				}
 
-				int ox = (DP(ui.screen_width) - mw) / 2;
+				int ox = DP_CENTER_PX(ui.screen_width, mw);
 				int oy = DP(ui.padding + ui.pill_height);
 				int selected_row = selected - start;
 				for (int i = start, j = 0; i < end; i++, j++) {
@@ -5464,7 +5464,7 @@ static int Menu_options(MenuList* list) {
 				GFX_sizeText(font.tiny, desc, DP(12), &w, &h);
 				GFX_blitText(
 				    font.tiny, desc, DP(12), COLOR_WHITE, screen,
-				    &(SDL_Rect){(DP(ui.screen_width) - w) / 2, DP(ui.screen_height) - DP(ui.padding) - h, w, h});
+				    &(SDL_Rect){DP_CENTER_PX(ui.screen_width, w), DP(ui.screen_height) - DP(ui.padding) - h, w, h});
 			}
 
 			GFX_flip(screen);

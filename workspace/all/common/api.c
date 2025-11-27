@@ -69,7 +69,7 @@ UI_Layout ui = {
     .pill_height = 30,
     .row_count = 6,
     .padding = 10,
-    .text_baseline = 4,
+    .text_baseline = 4, // (30 * 2) / 15 = 4 for 30dp pill
     .button_size = 20,
     .button_margin = 5,
     .button_padding = 12,
@@ -196,7 +196,11 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 
 	ui.button_margin = (ui.pill_height - ui.button_size) / 2; // Center button in pill
 	ui.button_padding = (ui.pill_height * 2) / 5; // ~12 for 30dp pill
-	ui.text_baseline = (4 * ui.pill_height + 15) / 30; // ~4 for 30dp pill
+
+	// Text baseline offset - positions text slightly above center to account for
+	// visual weight of font glyphs (most text sits above baseline, descenders are rare)
+	// Gives ~4dp for 30dp pill, scales proportionally with pill height
+	ui.text_baseline = (ui.pill_height * 2) / 15;
 
 	LOG_info("UI_initLayout: %dx%d @ %.2f\" → PPI=%.0f, dp_scale=%.2f\n", screen_width,
 	         screen_height, diagonal_inches, ppi, gfx_dp_scale);
@@ -1163,11 +1167,13 @@ void GFX_blitButton(char* hint, char* button, SDL_Surface* dst, SDL_Rect* dst_re
 	if (strlen(button) == 1) {
 		GFX_blitAsset(ASSET_BUTTON, NULL, dst, dst_rect);
 
-		// label
+		// label - center text in button using DP-aware centering
+		// Bias vertical position up slightly to account for visual weight of glyphs
 		text = TTF_RenderUTF8_Blended(font.medium, button, COLOR_BUTTON_TEXT);
+		int offset_y = DP_CENTER_PX(ui.button_size, text->h) - DP(1); // Move up ~1dp for visual balance
 		SDL_BlitSurface(text, NULL, dst,
-		                &(SDL_Rect){dst_rect->x + (DP(ui.button_size) - text->w) / 2,
-		                            dst_rect->y + (DP(ui.button_size) - text->h) / 2});
+		                &(SDL_Rect){dst_rect->x + DP_CENTER_PX(ui.button_size, text->w),
+		                            dst_rect->y + offset_y});
 		ox += DP(ui.button_size);
 		SDL_FreeSurface(text);
 	} else {
@@ -1181,7 +1187,7 @@ void GFX_blitButton(char* hint, char* button, SDL_Surface* dst, SDL_Rect* dst_re
 		int oy = special_case ? DP(-2) : 0;
 		SDL_BlitSurface(text, NULL, dst,
 		                &(SDL_Rect){ox + dst_rect->x,
-		                            oy + dst_rect->y + (DP(ui.button_size) - text->h) / 2, text->w,
+		                            oy + dst_rect->y + DP_CENTER_PX(ui.button_size, text->h), text->w,
 		                            text->h});
 		ox += text->w;
 		ox += DP(ui.button_size) / 4;
@@ -1193,7 +1199,7 @@ void GFX_blitButton(char* hint, char* button, SDL_Surface* dst, SDL_Rect* dst_re
 	// hint text
 	text = TTF_RenderUTF8_Blended(font.small, hint, COLOR_WHITE);
 	SDL_BlitSurface(text, NULL, dst,
-	                &(SDL_Rect){ox + dst_rect->x, dst_rect->y + (DP(ui.button_size) - text->h) / 2,
+	                &(SDL_Rect){ox + dst_rect->x, dst_rect->y + DP_CENTER_PX(ui.button_size, text->h),
 	                            text->w, text->h});
 	SDL_FreeSurface(text);
 }
@@ -2619,10 +2625,8 @@ void PWR_powerOff(void) {
 
 		// LOG_info("PWR_powerOff %s (%ix%i)\n", gfx.screen, gfx.screen->w, gfx.screen->h);
 
-		// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...
 		PLAT_clearVideo(gfx.screen);
-		GFX_blitMessage(font.large, msg, gfx.screen,
-		                &(SDL_Rect){0, 0, ui.screen_width, ui.screen_height}); //, NULL);
+		GFX_blitMessage_DP(font.large, msg, gfx.screen, 0, 0, ui.screen_width, ui.screen_height);
 		GFX_flip(gfx.screen);
 		PLAT_powerOff();
 	}

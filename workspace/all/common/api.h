@@ -62,6 +62,21 @@ extern float gfx_dp_scale;
 #define DP4(a, b, c, d) DP(a), DP(b), DP(c), DP(d)
 
 /**
+ * Center pixel content within DP container.
+ *
+ * Handles the common case where container size is in DP (converted to pixels
+ * with rounding) and content size is measured in pixels (e.g., from SDL_TTF).
+ * Uses round-to-nearest to avoid bias, ensuring good centering across all devices.
+ *
+ * @param dp_size Container size in display points
+ * @param px_size Content size in pixels (e.g., text->w from TTF_Render)
+ * @return Offset in pixels to center content (rounded to nearest)
+ *
+ * Example: DP_CENTER_PX(ui.button_size, text->w)
+ */
+#define DP_CENTER_PX(dp_size, px_size) (((DP(dp_size) - (px_size)) + 1) / 2)
+
+/**
  * Convert physical pixels to display points.
  *
  * Use this when you have pixel measurements (e.g., from SDL_TTF) and need
