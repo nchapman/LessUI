@@ -114,7 +114,9 @@ LessUI uses **three systems** for platform-specific `.pak` directories:
 - Each pak has its own directory with `pak.json`, `launch.sh`, and optional `src/`
 - Native code in `src/` is cross-compiled per platform
 - Constructed during `make system` (not `make setup`)
-- Example: `Clock/`, `Input/` (future), `Wifi/` (future)
+- **Completed migrations**: `Clock/`, `Input/`, `Bootlogo/`, `Files/`
+- Platform-specific resources supported via `<platform>/` directories
+- Hybrid pattern supported (native for some platforms, shell-only for others)
 
 **2. MinArch Paks** (`skeleton/TEMPLATES/minarch-paks/`) - Template-based for libretro cores:
 - `platforms.json` - Platform metadata (nice prefix, default settings)

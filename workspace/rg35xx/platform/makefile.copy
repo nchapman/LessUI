@@ -10,5 +10,3 @@ $(PLATFORM):
 	cp ./workspace/$@/ramdisk/patched-ramdisk.img ./build/SYSTEM/$@/dat/ramdisk.img
 	cp ./skeleton/SYSTEM/res/charging@2x.png ./build/SYSTEM/$@/dat/charging.png
 	# extras
-	cp ./workspace/$@/other/DinguxCommander/output/DinguxCommander ./build/EXTRAS/Tools/$@/Files.pak/
-	cp -r ./workspace/$@/other/DinguxCommander/res ./build/EXTRAS/Tools/$@/Files.pak/

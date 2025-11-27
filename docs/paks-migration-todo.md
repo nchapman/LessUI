@@ -21,6 +21,28 @@ This document tracks the migration of existing paks to the new unified architect
   - Successfully validates the cross-platform paks pattern
   - Builds and deploys successfully
 
+- [x] **Files** - Migrated to `workspace/all/paks/Files/`
+  - Platform-specific binaries (DinguxCommander, 351Files, system fileM)
+  - Launch.sh has platform branching using case/esac
+  - Successfully validates `bin/<platform>/` and `res/<platform>/` pattern
+  - Removed old skeleton copies (10 platforms)
+  - Removed platform-specific makefile.copy rules
+  - Builds and deploys successfully
+
+- [x] **Bootlogo** - Migrated to `workspace/all/paks/Bootlogo/`
+  - Cross-platform launch.sh with platform branching (7 platforms)
+  - Platform-specific resources in `<platform>/` directories
+  - Hybrid pak: native code for miyoomini, shell-only for others
+  - miyoomini: logoread.elf, logomake.elf, logowrite.elf (compiled)
+  - my282: bootlogo.bmp + res/ with firmware offsets
+  - my355: payload/bin/ with mkbootimg, unpackbootimg, rsce_tool
+  - tg5040: brick/ and default bootlogo.bmp variants
+  - zero28, m17, trimuismart: bootlogo.bmp files
+  - Enhanced with minui-presenter for user feedback
+  - Successfully validates hybrid pak pattern (native + shell)
+  - Removed old skeleton copies (7 platforms)
+  - Removed platform-specific makefile.copy rules
+
 ## Pending Migrations
 
 ### High Priority - Native Code Paks
@@ -29,15 +51,7 @@ None remaining!
 
 ### Medium Priority - Shell Script Paks
 
-- [ ] **Bootlogo** - `skeleton/EXTRAS/Tools/*/Bootlogo.pak/`
-  - Shell script only (no native code)
-  - Currently duplicated across ~8 platforms
-  - Tests non-native pak pattern
-
-- [ ] **Files** - `skeleton/EXTRAS/Tools/*/Files.pak/`
-  - Platform-specific binaries (DinguxCommander, 351Files, system fileM)
-  - Launch.sh has platform branching
-  - Tests `bin/<platform>/` pattern
+None remaining!
 
 ### Low Priority - Platform-Specific Paks
 
@@ -77,12 +91,11 @@ None remaining!
 
 ## Next Recommended Action
 
-**Migrate Bootlogo.pak** - Next straightforward step:
-1. Shell script only (no native code) - tests non-native pak pattern
-2. Currently duplicated across ~8 platforms
-3. Simple pak structure validates template for script-only paks
+**All high and medium priority tool paks are now migrated!**
 
-**Or consider Files.pak:**
-1. Tests platform-specific binaries pattern (`bin/<platform>/`)
-2. Tests platform branching in launch.sh
-3. More complex but demonstrates advanced pak capabilities
+Remaining paks are platform-specific (WiFi, ADBD, SSH, Splore, etc.). These can be migrated as needed or left as platform-specific since they only apply to 1-2 platforms each.
+
+Consider:
+1. WiFi pak - Most complex remaining, would benefit from unified approach
+2. Emulator paks - Evaluate if template system should migrate to unified paks
+3. Third-party pak documentation - Make it easy for external developers to contribute paks

@@ -170,12 +170,12 @@ system:
 			[ -d "$$pak_dir/res" ] && cp -r "$$pak_dir/res" "$$output_dir/"; \
 			[ -d "$$pak_dir/bin" ] && cp -r "$$pak_dir/bin" "$$output_dir/"; \
 			[ -d "$$pak_dir/lib" ] && cp -r "$$pak_dir/lib" "$$output_dir/"; \
+			[ -d "$$pak_dir/$(PLATFORM)" ] && cp -r "$$pak_dir/$(PLATFORM)/"* "$$output_dir/"; \
 			for elf in "$$pak_dir/build/$(PLATFORM)/"*.elf; do \
 				[ -f "$$elf" ] && cp "$$elf" "$$output_dir/"; \
 			done; \
 		fi \
 	done
-	cp ./workspace/all/minput/build/$(PLATFORM)/minput.elf ./build/EXTRAS/Tools/$(PLATFORM)/Input.pak/
 
 # Deploy shared libretro cores from minarch-cores GitHub releases
 # Downloads and extracts cores for both ARM architectures
@@ -221,7 +221,6 @@ clean:
 	rm -rf workspace/all/minarch/build
 	rm -rf workspace/all/paks/*/build
 	rm -rf workspace/all/utils/*/build
-	rm -rf workspace/all/minput/build
 	rm -rf workspace/all/say/build
 	rm -rf workspace/all/syncsettings/build
 	# Clean platform-specific boot outputs

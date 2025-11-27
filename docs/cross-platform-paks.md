@@ -398,37 +398,31 @@ Tool paks are constructed entirely during `make system`, not `make setup`. This 
 - `Makefile` (system target) - Constructs complete tool paks in build directory
 - `scripts/generate-paks.sh` - Only handles emulator paks (not tool paks)
 
-## Migration Guide (Completed for Clock)
+## Migration Guide (Completed)
 
-### What Was Migrated
+### Migrated Paks
 
-| Old Location | New Location |
-|--------------|--------------|
-| `workspace/all/clock/clock.c` | `workspace/all/paks/Clock/src/clock.c` |
-| `workspace/all/clock/makefile` | `workspace/all/paks/Clock/src/makefile` |
-| `skeleton/EXTRAS/Tools/*/Clock.pak/launch.sh` (×11) | `workspace/all/paks/Clock/launch.sh` (×1) |
+All high and medium priority tool paks have been successfully migrated:
 
-### Future Migrations
-
-| Current Location | Target Location |
-|------------------|-----------------|
-| `workspace/all/minput/` | `workspace/all/paks/Input/src/` |
-| `skeleton/EXTRAS/Tools/rgb30/Wi-Fi.pak/` | `workspace/all/paks/Wifi/` |
-| `skeleton/EXTRAS/Tools/*/Files.pak/` | `workspace/all/paks/Files/` |
-| `skeleton/EXTRAS/Tools/*/Bootlogo.pak/` | `workspace/all/paks/Bootlogo/` |
+| Pak | Type | Old Location | New Location | Highlights |
+|-----|------|--------------|--------------|------------|
+| **Clock** | Native | `workspace/all/clock/` | `workspace/all/paks/Clock/src/` | First migration, 11 duplicates eliminated |
+| **Input** | Native | `workspace/all/minput/` | `workspace/all/paks/Input/src/` | Second native pak, validates pattern |
+| **Bootlogo** | Hybrid | `skeleton/EXTRAS/Tools/*/Bootlogo.pak/` (×7) | `workspace/all/paks/Bootlogo/` | Native for miyoomini, shell for others; platform-specific resources; minui-presenter integration |
+| **Files** | Platform-Specific Binaries | `skeleton/EXTRAS/Tools/*/Files.pak/` (×10) | `workspace/all/paks/Files/` | Multiple file managers (DinguxCommander, 351Files); `bin/<platform>/` pattern |
 
 ### Migration Steps (Template)
 
-To migrate another pak (e.g., Input):
+For future pak migrations:
 
-1. **Create directory structure**: `mkdir -p workspace/all/paks/Input/src`
-2. **Move source**: `mv workspace/all/minput/*.c workspace/all/paks/Input/src/`
-3. **Create makefile**: Copy from Clock/src/makefile, adjust TARGET
-4. **Create pak.json**: Define name, platforms, build type
-5. **Create launch.sh**: Single cross-platform launcher
-6. **Remove old skeleton copies**: `rm -rf skeleton/EXTRAS/Tools/*/Input.pak`
-7. **Update workspace/makefile**: Remove old `cd ./all/minput/ && make` line
-8. **Test**: `make clean && make setup && make build PLATFORM=miyoomini && make system PLATFORM=miyoomini`
+1. **Examine**: Check all skeleton copies to understand platform differences
+2. **Create structure**: `mkdir -p workspace/all/paks/<Name>/src` (if native code)
+3. **Move files**: Source code, resources, binaries to unified location
+4. **Create pak.json**: Define name, platforms, build configuration
+5. **Create launch.sh**: Single cross-platform launcher (use `case "$PLATFORM"` for branching)
+6. **Update makefiles**: Remove old build/copy rules from workspace/makefile and makefile.copy files
+7. **Remove duplicates**: `rm -rf skeleton/EXTRAS/Tools/*/<Name>.pak`
+8. **Test**: `make clean && make setup && make build PLATFORM=<platform> && make system PLATFORM=<platform>`
 
 ## Relationship to Emulator Paks
 
