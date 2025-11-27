@@ -350,8 +350,8 @@ static int hasMode(const char* path, const char* mode) {
  *
  * Detects hardware variant (Mini vs Plus, 480p vs 560p) and allocates
  * ION memory for double-buffered rendering. The Plus variant is identified
- * by the presence of axp_test (AXP223 PMIC utility). The 560p mode requires
- * both hardware support and user opt-in via enable-560p file.
+ * by the presence of axp_test (AXP223 PMIC utility). The 560p mode is
+ * auto-enabled when hardware supports it.
  *
  * Memory Layout:
  * - Allocates 2 pages (PAGE_COUNT=2) of PAGE_SIZE each
@@ -365,7 +365,7 @@ static int hasMode(const char* path, const char* mode) {
 SDL_Surface* PLAT_initVideo(void) {
 	// Detect hardware variants
 	is_plus = exists("/customer/app/axp_test");
-	is_560p = hasMode(MODES_PATH, "752x560p") && exists(USERDATA_PATH "/enable-560p");
+	is_560p = hasMode(MODES_PATH, "752x560p");
 	LOG_info("is 560p: %i\n", is_560p);
 
 	// Initialize SDL with custom battery handling
@@ -645,51 +645,6 @@ void PLAT_flip(SDL_Surface* IGNORED, int sync) {
 		PLAT_clearVideo(vid.screen);
 		vid.cleared = 0;
 	}
-}
-
-///////////////////////////////
-// Overlay (On-Screen Display)
-///////////////////////////////
-
-#define OVERLAY_WIDTH PILL_SIZE
-#define OVERLAY_HEIGHT PILL_SIZE
-#define OVERLAY_BPP 4
-#define OVERLAY_DEPTH 16
-#define OVERLAY_PITCH (OVERLAY_WIDTH * OVERLAY_BPP)
-#define OVERLAY_RGBA_MASK 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000 // ARGB
-
-static struct OVL_Context {
-	SDL_Surface* overlay;
-} ovl;
-
-/**
- * Initializes overlay surface for on-screen indicators.
- *
- * @return Overlay surface for rendering status indicators
- */
-SDL_Surface* PLAT_initOverlay(void) {
-	ovl.overlay = SDL_CreateRGBSurface(SDL_SWSURFACE, SCALE2(OVERLAY_WIDTH, OVERLAY_HEIGHT),
-	                                   OVERLAY_DEPTH, OVERLAY_RGBA_MASK);
-	return ovl.overlay;
-}
-
-/**
- * Cleans up overlay surface.
- */
-void PLAT_quitOverlay(void) {
-	if (ovl.overlay)
-		SDL_FreeSurface(ovl.overlay);
-}
-
-/**
- * Enables or disables overlay display.
- *
- * @param enable 1 to enable, 0 to disable
- *
- * @note Currently no-op, overlay always composited by upper layers
- */
-void PLAT_enableOverlay(int enable) {
-	// Overlay composited in software, no hardware control needed
 }
 
 ///////////////////////////////

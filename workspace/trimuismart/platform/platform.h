@@ -15,6 +15,12 @@
 #define PLATFORM_H
 
 ///////////////////////////////
+// Platform Identification
+///////////////////////////////
+
+#define PLATFORM "trimuismart"
+
+///////////////////////////////
 // Dependencies
 ///////////////////////////////
 
@@ -128,13 +134,9 @@
 // Display Specifications
 ///////////////////////////////
 
-#define FIXED_SCALE 1 // No scaling (1:1 pixel mapping)
+#define SCREEN_DIAGONAL 2.4f // Physical screen diagonal in inches
 #define FIXED_WIDTH 320 // Screen width in pixels
 #define FIXED_HEIGHT 240 // Screen height in pixels (QVGA)
-#define FIXED_BPP 2 // Bytes per pixel (RGB565)
-#define FIXED_DEPTH (FIXED_BPP * 8) // Bit depth (16-bit color)
-#define FIXED_PITCH (FIXED_WIDTH * FIXED_BPP) // Row stride in bytes
-#define FIXED_SIZE (FIXED_PITCH * FIXED_HEIGHT) // Total framebuffer size
 
 ///////////////////////////////
 // Platform-Specific Paths and Settings

@@ -813,52 +813,6 @@ int PLAT_supportsOverscan(void) {
 }
 
 ///////////////////////////////
-// Overlay (HUD Icons)
-///////////////////////////////
-
-#define OVERLAY_WIDTH PILL_SIZE // unscaled
-#define OVERLAY_HEIGHT PILL_SIZE // unscaled
-#define OVERLAY_BPP 4
-#define OVERLAY_DEPTH 16
-#define OVERLAY_PITCH (OVERLAY_WIDTH * OVERLAY_BPP) // unscaled
-#define OVERLAY_RGBA_MASK 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000 // ARGB
-static struct OVL_Context {
-	SDL_Surface* overlay;
-} ovl;
-
-/**
- * Initializes overlay surface for HUD icons.
- *
- * Creates ARGB surface for battery, volume, and other status icons.
- *
- * @return Overlay surface pointer
- */
-SDL_Surface* PLAT_initOverlay(void) {
-	ovl.overlay = SDL_CreateRGBSurface(SDL_SWSURFACE, SCALE2(OVERLAY_WIDTH, OVERLAY_HEIGHT),
-	                                   OVERLAY_DEPTH, OVERLAY_RGBA_MASK);
-	return ovl.overlay;
-}
-
-/**
- * Cleans up overlay resources.
- */
-void PLAT_quitOverlay(void) {
-	if (ovl.overlay)
-		SDL_FreeSurface(ovl.overlay);
-}
-
-/**
- * Enables or disables overlay rendering (not implemented).
- *
- * @param enable Whether to enable overlay
- *
- * @note Overlay is always composited with main screen
- */
-void PLAT_enableOverlay(int enable) {
-	// Overlay always enabled
-}
-
-///////////////////////////////
 // Power and Battery Management
 ///////////////////////////////
 

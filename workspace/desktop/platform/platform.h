@@ -15,6 +15,12 @@
 #define PLATFORM_H
 
 ///////////////////////////////
+// Platform Identification
+///////////////////////////////
+
+#define PLATFORM "desktop"
+
+///////////////////////////////
 // Dependencies
 ///////////////////////////////
 
@@ -129,27 +135,10 @@
 // Display Specifications
 ///////////////////////////////
 
-#define FIXED_SCALE 2 // 2x scaling factor for UI
+// Desktop uses a virtual 2.78" screen at VGA resolution to get dp_scale ≈ 2.0 (with 144 PPI baseline)
+#define SCREEN_DIAGONAL 2.78f // Virtual screen diagonal for consistent scaling
 #define FIXED_WIDTH 640 // Screen width in pixels
 #define FIXED_HEIGHT 480 // Screen height in pixels (VGA)
-#define FIXED_BPP 2 // Bytes per pixel (RGB565)
-#define FIXED_DEPTH (FIXED_BPP * 8) // Bit depth (16-bit color)
-#define FIXED_PITCH (FIXED_WIDTH * FIXED_BPP) // Row stride in bytes
-#define FIXED_SIZE (FIXED_PITCH * FIXED_HEIGHT) // Total framebuffer size
-
-// HDMI output support (currently disabled)
-// #define HAS_HDMI	1
-// #define HDMI_WIDTH 	1280
-// #define HDMI_HEIGHT 720
-// #define HDMI_PITCH 	(HDMI_WIDTH * FIXED_BPP)
-// #define HDMI_SIZE	(HDMI_PITCH * HDMI_HEIGHT)
-
-///////////////////////////////
-// UI Layout Configuration
-///////////////////////////////
-
-#define MAIN_ROW_COUNT 6 // Number of rows visible in menu
-#define PADDING 10 // Padding for UI elements in pixels
 
 ///////////////////////////////
 // Platform-Specific Paths and Settings

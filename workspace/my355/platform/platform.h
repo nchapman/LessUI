@@ -16,6 +16,12 @@
 #define PLATFORM_H
 
 ///////////////////////////////
+// Platform Identification
+///////////////////////////////
+
+#define PLATFORM "my355"
+
+///////////////////////////////
 // Dependencies
 ///////////////////////////////
 
@@ -146,13 +152,9 @@ extern int on_hdmi; // Set to 1 when HDMI output is active
 // Display Specifications
 ///////////////////////////////
 
-#define FIXED_SCALE 2 // 2x scaling factor for UI
+#define SCREEN_DIAGONAL 3.5f // Physical screen diagonal in inches (Miyoo Flip)
 #define FIXED_WIDTH 640 // Screen width in pixels
 #define FIXED_HEIGHT 480 // Screen height in pixels (VGA)
-#define FIXED_BPP 2 // Bytes per pixel (RGB565)
-#define FIXED_DEPTH (FIXED_BPP * 8) // Bit depth (16-bit color)
-#define FIXED_PITCH (FIXED_WIDTH * FIXED_BPP) // Row stride in bytes
-#define FIXED_SIZE (FIXED_PITCH * FIXED_HEIGHT) // Total framebuffer size
 
 ///////////////////////////////
 // HDMI Output Specifications
@@ -161,18 +163,6 @@ extern int on_hdmi; // Set to 1 when HDMI output is active
 #define HAS_HDMI 1 // HDMI output supported
 #define HDMI_WIDTH 1280 // HDMI width in pixels
 #define HDMI_HEIGHT 720 // HDMI height in pixels (720p)
-#define HDMI_PITCH (HDMI_WIDTH * FIXED_BPP) // HDMI row stride
-#define HDMI_SIZE (HDMI_PITCH * HDMI_HEIGHT) // HDMI framebuffer size
-
-// TODO: if HDMI_HEIGHT > FIXED_HEIGHT then MAIN_ROW_COUNT will be insufficient
-
-///////////////////////////////
-// UI Layout Configuration
-// Adjusted for HDMI output
-///////////////////////////////
-
-#define MAIN_ROW_COUNT (on_hdmi ? 8 : 6) // Number of rows visible: 8 (HDMI) or 6 (LCD)
-#define PADDING (on_hdmi ? 40 : 10) // UI padding: 40px (HDMI) or 10px (LCD)
 
 ///////////////////////////////
 // Platform-Specific Paths and Settings

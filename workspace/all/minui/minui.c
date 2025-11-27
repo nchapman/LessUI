@@ -1739,8 +1739,7 @@ static void openDirectory(char* path, int auto_launch) {
 	if (top) {
 		top->start = start;
 		top->end =
-		    end ? end
-		        : ((top->entries->count < MAIN_ROW_COUNT) ? top->entries->count : MAIN_ROW_COUNT);
+		    end ? end : ((top->entries->count < ui.row_count) ? top->entries->count : ui.row_count);
 		Array_push(stack, top);
 	}
 }
@@ -1886,10 +1885,10 @@ static void loadLast(void) {
 					top->selected = i;
 					if (i >= top->end) {
 						top->start = i;
-						top->end = top->start + MAIN_ROW_COUNT;
+						top->end = top->start + ui.row_count;
 						if (top->end > top->entries->count) {
 							top->end = top->entries->count;
-							top->start = top->end - MAIN_ROW_COUNT;
+							top->start = top->end - ui.row_count;
 						}
 					}
 					if (last->count == 0 && !exactMatch(entry->path, FAUX_RECENT_PATH) &&
@@ -2055,7 +2054,7 @@ int main(int argc, char* argv[]) {
 						selected -= 1;
 						if (selected < 0) {
 							selected = total - 1;
-							int start = total - MAIN_ROW_COUNT;
+							int start = total - ui.row_count;
 							top->start = (start < 0) ? 0 : start;
 							top->end = total;
 						} else if (selected < top->start) {
@@ -2071,7 +2070,7 @@ int main(int argc, char* argv[]) {
 						if (selected >= total) {
 							selected = 0;
 							top->start = 0;
-							top->end = (total < MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
+							top->end = (total < ui.row_count) ? total : ui.row_count;
 						} else if (selected >= top->end) {
 							top->start += 1;
 							top->end += 1;
@@ -2079,29 +2078,29 @@ int main(int argc, char* argv[]) {
 					}
 				}
 				if (PAD_justRepeated(BTN_LEFT)) {
-					selected -= MAIN_ROW_COUNT;
+					selected -= ui.row_count;
 					if (selected < 0) {
 						selected = 0;
 						top->start = 0;
-						top->end = (total < MAIN_ROW_COUNT) ? total : MAIN_ROW_COUNT;
+						top->end = (total < ui.row_count) ? total : ui.row_count;
 					} else if (selected < top->start) {
-						top->start -= MAIN_ROW_COUNT;
+						top->start -= ui.row_count;
 						if (top->start < 0)
 							top->start = 0;
-						top->end = top->start + MAIN_ROW_COUNT;
+						top->end = top->start + ui.row_count;
 					}
 				} else if (PAD_justRepeated(BTN_RIGHT)) {
-					selected += MAIN_ROW_COUNT;
+					selected += ui.row_count;
 					if (selected >= total) {
 						selected = total - 1;
-						int start = total - MAIN_ROW_COUNT;
+						int start = total - ui.row_count;
 						top->start = (start < 0) ? 0 : start;
 						top->end = total;
 					} else if (selected >= top->end) {
-						top->end += MAIN_ROW_COUNT;
+						top->end += ui.row_count;
 						if (top->end > total)
 							top->end = total;
-						top->start = top->end - MAIN_ROW_COUNT;
+						top->start = top->end - ui.row_count;
 					}
 				}
 			}
@@ -2113,12 +2112,12 @@ int main(int argc, char* argv[]) {
 				int i = entry->alpha - 1;
 				if (i >= 0) {
 					selected = top->alphas->items[i];
-					if (total > MAIN_ROW_COUNT) {
+					if (total > ui.row_count) {
 						top->start = selected;
-						top->end = top->start + MAIN_ROW_COUNT;
+						top->end = top->start + ui.row_count;
 						if (top->end > total)
 							top->end = total;
-						top->start = top->end - MAIN_ROW_COUNT;
+						top->start = top->end - ui.row_count;
 					}
 				}
 			} else if (PAD_justRepeated(BTN_R1) && !PAD_isPressed(BTN_L1) &&
@@ -2127,12 +2126,12 @@ int main(int argc, char* argv[]) {
 				int i = entry->alpha + 1;
 				if (i < top->alphas->count) {
 					selected = top->alphas->items[i];
-					if (total > MAIN_ROW_COUNT) {
+					if (total > ui.row_count) {
 						top->start = selected;
-						top->end = top->start + MAIN_ROW_COUNT;
+						top->end = top->start + ui.row_count;
 						if (top->end > total)
 							top->end = total;
-						top->start = top->end - MAIN_ROW_COUNT;
+						top->start = top->end - ui.row_count;
 					}
 				}
 			}
@@ -2254,22 +2253,22 @@ int main(int argc, char* argv[]) {
 						r_width = val_txt->w;
 
 #define VERSION_LINE_HEIGHT 24
-					int x = l_width + SCALE1(8);
+					int x = l_width + DP(8);
 					int w = x + r_width;
-					int h = SCALE1(VERSION_LINE_HEIGHT * 4);
+					int h = DP(VERSION_LINE_HEIGHT * 4);
 					version = SDL_CreateRGBSurface(0, w, h, 16, 0, 0, 0, 0);
 
 					SDL_BlitSurface(release_txt, NULL, version, &(SDL_Rect){0, 0, 0, 0});
 					SDL_BlitSurface(version_txt, NULL, version, &(SDL_Rect){x, 0, 0, 0});
 					SDL_BlitSurface(commit_txt, NULL, version,
-					                &(SDL_Rect){0, SCALE1(VERSION_LINE_HEIGHT), 0, 0});
+					                &(SDL_Rect){0, DP(VERSION_LINE_HEIGHT), 0, 0});
 					SDL_BlitSurface(hash_txt, NULL, version,
-					                &(SDL_Rect){x, SCALE1(VERSION_LINE_HEIGHT), 0, 0});
+					                &(SDL_Rect){x, DP(VERSION_LINE_HEIGHT), 0, 0});
 
 					SDL_BlitSurface(key_txt, NULL, version,
-					                &(SDL_Rect){0, SCALE1(VERSION_LINE_HEIGHT * 3), 0, 0});
+					                &(SDL_Rect){0, DP(VERSION_LINE_HEIGHT * 3), 0, 0});
 					SDL_BlitSurface(val_txt, NULL, version,
-					                &(SDL_Rect){x, SCALE1(VERSION_LINE_HEIGHT * 3), 0, 0});
+					                &(SDL_Rect){x, DP(VERSION_LINE_HEIGHT * 3), 0, 0});
 
 					SDL_FreeSurface(release_txt);
 					SDL_FreeSurface(version_txt);
@@ -2278,9 +2277,13 @@ int main(int argc, char* argv[]) {
 					SDL_FreeSurface(key_txt);
 					SDL_FreeSurface(val_txt);
 				}
-				SDL_BlitSurface(
-				    version, NULL, screen,
-				    &(SDL_Rect){(screen->w - version->w) / 2, (screen->h - version->h) / 2, 0, 0});
+				// Version splash centering - work in DP space
+				int version_w_dp = (int)(version->w / gfx_dp_scale + 0.5f);
+				int version_h_dp = (int)(version->h / gfx_dp_scale + 0.5f);
+				int center_x_dp = (ui.screen_width - version_w_dp) / 2;
+				int center_y_dp = (ui.screen_height - version_h_dp) / 2;
+				SDL_BlitSurface(version, NULL, screen,
+				                &(SDL_Rect){DP(center_x_dp), DP(center_y_dp), 0, 0});
 
 				// buttons (duped and trimmed from below)
 				if (show_setting && !GetHDMI())
@@ -2299,8 +2302,11 @@ int main(int argc, char* argv[]) {
 						Entry* entry = top->entries->items[i];
 						char* entry_name = entry->name;
 						char* entry_unique = entry->unique;
+						// Calculate available width in pixels
+						// ox is in pixels (thumbnail offset), screen width converted from DP to pixels
 						int available_width =
-						    (had_thumb && j != selected_row ? ox : screen->w) - SCALE1(PADDING * 2);
+						    (had_thumb && j != selected_row ? ox : DP(ui.screen_width)) -
+						    DP(ui.padding * 2);
 						if (i == top->start && !(had_thumb && j != selected_row))
 							available_width -= ow; //
 
@@ -2311,46 +2317,48 @@ int main(int argc, char* argv[]) {
 						char display_name[256];
 						int text_width = GFX_truncateText(
 						    font.large, entry_unique ? entry_unique : entry_name, display_name,
-						    available_width, SCALE1(BUTTON_PADDING * 2));
+						    available_width, DP(ui.button_padding * 2));
 						int max_width = MIN(available_width, text_width);
 						if (j == selected_row) {
 							GFX_blitPill(ASSET_WHITE_PILL, screen,
-							             &(SDL_Rect){SCALE1(PADDING),
-							                         SCALE1(PADDING + (j * PILL_SIZE)), max_width,
-							                         SCALE1(PILL_SIZE)});
+							             &(SDL_Rect){DP(ui.padding),
+							                         DP(ui.padding + (j * ui.pill_height)),
+							                         max_width, DP(ui.pill_height)});
 							text_color = COLOR_BLACK;
 						} else if (entry->unique) {
 							trimSortingMeta(&entry_unique);
 							char unique_name[256];
 							GFX_truncateText(font.large, entry_unique, unique_name, available_width,
-							                 SCALE1(BUTTON_PADDING * 2));
+							                 DP(ui.button_padding * 2));
 
 							SDL_Surface* text =
 							    TTF_RenderUTF8_Blended(font.large, unique_name, COLOR_DARK_TEXT);
 							SDL_BlitSurface(
 							    text,
-							    &(SDL_Rect){0, 0, max_width - SCALE1(BUTTON_PADDING * 2), text->h},
+							    &(SDL_Rect){0, 0, max_width - DP(ui.button_padding * 2), text->h},
 							    screen,
-							    &(SDL_Rect){SCALE1(PADDING + BUTTON_PADDING),
-							                SCALE1(PADDING + (j * PILL_SIZE) + 4), 0, 0});
+							    &(SDL_Rect){
+							        DP(ui.padding + ui.button_padding),
+							        DP(ui.padding + (j * ui.pill_height) + ui.text_baseline), 0,
+							        0});
 
 							GFX_truncateText(font.large, entry_name, display_name, available_width,
-							                 SCALE1(BUTTON_PADDING * 2));
+							                 DP(ui.button_padding * 2));
 						}
 						SDL_Surface* text =
 						    TTF_RenderUTF8_Blended(font.large, display_name, text_color);
 						SDL_BlitSurface(
-						    text,
-						    &(SDL_Rect){0, 0, max_width - SCALE1(BUTTON_PADDING * 2), text->h},
+						    text, &(SDL_Rect){0, 0, max_width - DP(ui.button_padding * 2), text->h},
 						    screen,
-						    &(SDL_Rect){SCALE1(PADDING + BUTTON_PADDING),
-						                SCALE1(PADDING + (j * PILL_SIZE) + 4), 0, 0});
+						    &(SDL_Rect){DP(ui.padding + ui.button_padding),
+						                DP(ui.padding + (j * ui.pill_height) + ui.text_baseline), 0,
+						                0});
 						SDL_FreeSurface(text);
 					}
 				} else {
-					// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...
-					GFX_blitMessage(font.large, "Empty folder", screen,
-					                &(SDL_Rect){0, 0, screen->w, screen->h}); //, NULL);
+					// Use DP-based wrapper for proper scaling
+					GFX_blitMessage_DP(font.large, "Empty folder", screen, 0, 0, ui.screen_width,
+					                   ui.screen_height);
 				}
 
 				// buttons

@@ -91,39 +91,9 @@ SDL_Surface* PLAT_initVideo(void) {
 	// Detect Brick variant
 	char* device = getenv("DEVICE");
 	is_brick = exactMatch("brick", device);
-	// LOG_info("DEVICE: %s is_brick: %i\n", device, is_brick);
 
 	SDL_InitSubSystem(SDL_INIT_VIDEO);
 	SDL_ShowCursor(0);
-
-	// SDL_version compiled;
-	// SDL_version linked;
-	// SDL_VERSION(&compiled);
-	// SDL_GetVersion(&linked);
-	// LOG_info("Compiled SDL version %d.%d.%d ...\n", compiled.major, compiled.minor, compiled.patch);
-	// LOG_info("Linked SDL version %d.%d.%d.\n", linked.major, linked.minor, linked.patch);
-	//
-	// LOG_info("Available video drivers:\n");
-	// for (int i=0; i<SDL_GetNumVideoDrivers(); i++) {
-	// 	LOG_info("- %s\n", SDL_GetVideoDriver(i));
-	// }
-	// LOG_info("Current video driver: %s\n", SDL_GetCurrentVideoDriver());
-	//
-	// LOG_info("Available render drivers:\n");
-	// for (int i=0; i<SDL_GetNumRenderDrivers(); i++) {
-	// 	SDL_RendererInfo info;
-	// 	SDL_GetRenderDriverInfo(i,&info);
-	// 	LOG_info("- %s\n", info.name);
-	// }
-	//
-	// LOG_info("Available display modes:\n");
-	// SDL_DisplayMode mode;
-	// for (int i=0; i<SDL_GetNumDisplayModes(0); i++) {
-	// 	SDL_GetDisplayMode(0, i, &mode);
-	// 	LOG_info("- %ix%i (%s)\n", mode.w,mode.h, SDL_GetPixelFormatName(mode.format));
-	// }
-	// SDL_GetCurrentDisplayMode(0, &mode);
-	// LOG_info("Current display mode: %ix%i (%s)\n", mode.w,mode.h, SDL_GetPixelFormatName(mode.format));
 
 	int w = FIXED_WIDTH;
 	int h = FIXED_HEIGHT;
@@ -517,31 +487,6 @@ void PLAT_flip(SDL_Surface* IGNORED, int ignored) {
 	// LOG_info("SDL_RenderPresent blocked for %ims\n", SDL_GetTicks()-then);
 	vid.blit = NULL;
 }
-
-///////////////////////////////
-// Overlay
-///////////////////////////////
-
-#define OVERLAY_WIDTH PILL_SIZE // unscaled
-#define OVERLAY_HEIGHT PILL_SIZE // unscaled
-#define OVERLAY_BPP 4
-#define OVERLAY_DEPTH 16
-#define OVERLAY_PITCH (OVERLAY_WIDTH * OVERLAY_BPP) // unscaled
-#define OVERLAY_RGBA_MASK 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000 // ARGB
-static struct OVL_Context {
-	SDL_Surface* overlay;
-} ovl;
-
-SDL_Surface* PLAT_initOverlay(void) {
-	ovl.overlay = SDL_CreateRGBSurface(SDL_SWSURFACE, SCALE2(OVERLAY_WIDTH, OVERLAY_HEIGHT),
-	                                   OVERLAY_DEPTH, OVERLAY_RGBA_MASK);
-	return ovl.overlay;
-}
-void PLAT_quitOverlay(void) {
-	if (ovl.overlay)
-		SDL_FreeSurface(ovl.overlay);
-}
-void PLAT_enableOverlay(int enable) {}
 
 ///////////////////////////////
 // Power and Hardware

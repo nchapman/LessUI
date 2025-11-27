@@ -57,6 +57,163 @@ uint32_t RGB_LIGHT_GRAY;
 uint32_t RGB_GRAY;
 uint32_t RGB_DARK_GRAY;
 
+///////////////////////////////
+// Display Points (DP) scaling system
+///////////////////////////////
+
+// Global display scale factor (PPI / 144)
+float gfx_dp_scale = 2.0f; // Default to 2x until UI_initLayout is called
+
+// Runtime-calculated UI layout parameters
+UI_Layout ui = {
+    .pill_height = 30,
+    .row_count = 6,
+    .padding = 10,
+    .text_baseline = 4, // (30 * 2) / 15 = 4 for 30dp pill
+    .button_size = 20,
+    .button_margin = 5,
+    .button_padding = 12,
+};
+
+/**
+ * Initializes the resolution-independent UI scaling system.
+ *
+ * Calculates dp_scale from screen PPI, snaps to favorable ratios for clean
+ * asset scaling, then determines optimal pill height to fill the screen.
+ *
+ * DP Scale Calculation:
+ *   1. Calculate PPI: sqrt(width² + height²) / diagonal_inches
+ *   2. Calculate raw dp_scale: ppi / 144.0 (handheld gaming device baseline)
+ *   3. Apply optional SCALE_MODIFIER if defined in platform.h
+ *
+ * Row Fitting Algorithm:
+ *   - Try 8→6 rows (prefer more content)
+ *   - For each row count, calculate pill height to fill available space
+ *   - Select first configuration where pill fits 28-32dp range
+ *   - Adjust pill_height to produce even physical pixels (for centering)
+ *
+ * @param screen_width Screen width in physical pixels
+ * @param screen_height Screen height in physical pixels
+ * @param diagonal_inches Physical screen diagonal in inches (from platform.h)
+ *
+ * @note Sets global gfx_dp_scale and ui struct values
+ * @note Must be called before any DP() macro usage
+ */
+void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
+	// Calculate PPI and dp_scale
+	float diagonal_px = sqrtf((float)(screen_width * screen_width + screen_height * screen_height));
+	float ppi = diagonal_px / diagonal_inches;
+	float raw_dp_scale = ppi / 144.0f;
+
+	// Apply platform scale modifier if defined
+#ifdef SCALE_MODIFIER
+	raw_dp_scale *= SCALE_MODIFIER;
+#endif
+
+	// Use the calculated dp_scale directly (no snapping to preserve PPI accuracy)
+	// Asset-level even-pixel adjustments handle rounding where needed
+	gfx_dp_scale = raw_dp_scale;
+
+	// Layout calculation: treat everything as uniform rows
+	// Screen layout: top_padding + content_rows + footer_row + bottom_padding
+	// All rows (content + footer) use the same pill_height for visual consistency
+	const int MIN_PILL = 28;
+	const int MAX_PILL = 32;
+	const int DEFAULT_PADDING = 10;
+
+	int screen_height_dp = (int)(screen_height / gfx_dp_scale + 0.5f);
+	int available_dp = screen_height_dp - (DEFAULT_PADDING * 2);
+
+	// Calculate maximum possible rows (no arbitrary limit)
+	int max_possible_rows = (available_dp / MIN_PILL) - 1; // -1 for footer
+	if (max_possible_rows < 1)
+		max_possible_rows = 1;
+
+	// Try different row counts, starting from maximum (prefer more content)
+	// Prefer even pixels but accept odd if needed
+	int best_pill = 0;
+	int best_rows = 0;
+	int best_is_even = 0;
+
+	for (int content_rows = max_possible_rows; content_rows >= 1; content_rows--) {
+		int total_rows = content_rows + 1; // +1 for footer
+		int pill = available_dp / total_rows;
+
+		// Early exit: pills only get larger as rows decrease
+		if (pill > MAX_PILL)
+			break;
+
+		int pill_px = DP(pill);
+		int is_even = (pill_px % 2 == 0);
+
+		if (pill >= MIN_PILL) {
+			if (is_even) {
+				// Perfect: in range AND even pixels
+				best_pill = pill;
+				best_rows = content_rows;
+				best_is_even = 1;
+				LOG_info("Row calc: %d rows → pill=%ddp (%dpx even) ✓\n", content_rows, pill,
+				         pill_px);
+				break;
+			} else if (best_rows == 0) {
+				// Acceptable but odd pixels - keep as backup
+				best_pill = pill;
+				best_rows = content_rows;
+				LOG_info("Row calc: %d rows → pill=%ddp (%dpx odd) - backup\n", content_rows, pill,
+				         pill_px);
+			}
+		}
+	}
+
+	if (best_is_even) {
+		LOG_info("Row calc: Using even-pixel configuration\n");
+	} else if (best_rows > 0) {
+		LOG_info("Row calc: Using odd-pixel fallback (no even option in range)\n");
+	} else {
+		// Emergency fallback (should never happen with reasonable MIN_PILL)
+		best_pill = MIN_PILL;
+		best_rows = 1;
+		LOG_info("Row calc: EMERGENCY FALLBACK to %ddp, 1 row\n", MIN_PILL);
+	}
+
+	ui.screen_width = (int)(screen_width / gfx_dp_scale + 0.5f);
+	ui.screen_height = screen_height_dp;
+	ui.screen_width_px = screen_width;
+	ui.screen_height_px = screen_height;
+	ui.pill_height = best_pill;
+	ui.row_count = best_rows;
+	ui.padding = DEFAULT_PADDING;
+
+	int used_dp = (ui.row_count + 1) * ui.pill_height;
+	(void)used_dp; // Used in LOG_info below
+	LOG_info("Row calc: FINAL rows=%d, pill=%ddp (%dpx), using %d/%d dp (%.1f%%)\n", ui.row_count,
+	         ui.pill_height, DP(ui.pill_height), used_dp, available_dp,
+	         (used_dp * 100.0f) / available_dp);
+
+	// Derived proportional sizes (also ensure even pixels where needed)
+	ui.button_size = (ui.pill_height * 2) / 3; // ~20 for 30dp pill
+	int button_px = DP(ui.button_size);
+	if (button_px % 2 != 0)
+		ui.button_size++; // Buttons look better even
+
+	ui.button_margin = (ui.pill_height - ui.button_size) / 2; // Center button in pill
+	ui.button_padding = (ui.pill_height * 2) / 5; // ~12 for 30dp pill
+
+	// Text baseline offset - positions text slightly above center to account for
+	// visual weight of font glyphs (most text sits above baseline, descenders are rare)
+	// Gives ~4dp for 30dp pill, scales proportionally with pill height
+	ui.text_baseline = (ui.pill_height * 2) / 15;
+
+	// Settings indicators
+	ui.settings_size = ui.pill_height / 8; // ~4dp for 30dp pill
+	ui.settings_width = 80; // Fixed width in dp
+
+	LOG_info("UI_initLayout: %dx%d @ %.2f\" → PPI=%.0f, dp_scale=%.2f\n", screen_width,
+	         screen_height, diagonal_inches, ppi, gfx_dp_scale);
+	LOG_info("UI_initLayout: pill=%ddp, rows=%d, padding=%ddp\n", ui.pill_height, ui.row_count,
+	         ui.padding);
+}
+
 static struct GFX_Context {
 	SDL_Surface* screen;
 	SDL_Surface* assets;
@@ -94,20 +251,113 @@ static struct PWR_Context {
 static int _;
 
 /**
+ * Scales a surface using bilinear interpolation.
+ *
+ * Performs smooth downscaling/upscaling of RGBA8888 or RGB888 surfaces
+ * using bilinear filtering. Each output pixel samples the 4 nearest source
+ * pixels and interpolates linearly in both X and Y directions.
+ *
+ * Used for scaling UI assets (icons, pills, buttons) from @1x/@2x/@3x/@4x
+ * tiers to the exact dp_scale required by the current screen. Provides
+ * smooth edges compared to nearest-neighbor scaling.
+ *
+ * @param src Source surface to scale
+ * @param dst Destination surface (must be pre-allocated at target size)
+ *
+ * @note Both surfaces must be locked if SDL_MUSTLOCK is true
+ * @note Works with 3-byte (RGB888) and 4-byte (RGBA8888) pixel formats
+ * @note dst dimensions determine the output scale
+ */
+static void GFX_scaleBilinear(SDL_Surface* src, SDL_Surface* dst) {
+	if (!src || !dst)
+		return;
+
+	int src_w = src->w;
+	int src_h = src->h;
+	int dst_w = dst->w;
+	int dst_h = dst->h;
+
+	// Calculate scale ratios (how much to step through source for each dest pixel)
+	float x_ratio = ((float)src_w) / dst_w;
+	float y_ratio = ((float)src_h) / dst_h;
+
+	// Determine bytes per pixel (3 for RGB, 4 for RGBA)
+	int bpp = src->format->BytesPerPixel;
+
+	// Lock surfaces if needed
+	if (SDL_MUSTLOCK(src))
+		SDL_LockSurface(src);
+	if (SDL_MUSTLOCK(dst))
+		SDL_LockSurface(dst);
+
+	uint8_t* src_pixels = (uint8_t*)src->pixels;
+	uint8_t* dst_pixels = (uint8_t*)dst->pixels;
+
+	for (int y = 0; y < dst_h; y++) {
+		for (int x = 0; x < dst_w; x++) {
+			// Source coordinates (floating point)
+			float src_x = x * x_ratio;
+			float src_y = y * y_ratio;
+
+			// Integer coordinates of surrounding pixels
+			int x1 = (int)src_x;
+			int y1 = (int)src_y;
+			int x2 = (x1 + 1 < src_w) ? x1 + 1 : x1;
+			int y2 = (y1 + 1 < src_h) ? y1 + 1 : y1;
+
+			// Fractional parts for interpolation
+			float x_frac = src_x - x1;
+			float y_frac = src_y - y1;
+
+			// Get pointers to the 4 surrounding pixels
+			uint8_t* p11 = src_pixels + (y1 * src->pitch) + (x1 * bpp);
+			uint8_t* p12 = src_pixels + (y1 * src->pitch) + (x2 * bpp);
+			uint8_t* p21 = src_pixels + (y2 * src->pitch) + (x1 * bpp);
+			uint8_t* p22 = src_pixels + (y2 * src->pitch) + (x2 * bpp);
+
+			// Bilinear interpolation for each channel
+			uint8_t* dst_pixel = dst_pixels + (y * dst->pitch) + (x * bpp);
+
+			for (int c = 0; c < bpp; c++) {
+				// Interpolate horizontally on top row
+				float top = p11[c] * (1.0f - x_frac) + p12[c] * x_frac;
+				// Interpolate horizontally on bottom row
+				float bottom = p21[c] * (1.0f - x_frac) + p22[c] * x_frac;
+				// Interpolate vertically
+				float result = top * (1.0f - y_frac) + bottom * y_frac;
+				dst_pixel[c] = (uint8_t)(result + 0.5f);
+			}
+		}
+	}
+
+	// Unlock surfaces
+	if (SDL_MUSTLOCK(dst))
+		SDL_UnlockSurface(dst);
+	if (SDL_MUSTLOCK(src))
+		SDL_UnlockSurface(src);
+}
+
+/**
  * Initializes the graphics subsystem.
  *
- * Sets up SDL video, loads UI assets, initializes fonts, and prepares
- * the color palette. This must be called before any other GFX_ functions.
+ * Sets up SDL video, initializes the DP scaling system, loads and scales
+ * UI assets, initializes fonts, and prepares the color palette.
  *
- * Asset loading:
- * - Loads platform-specific asset PNG (e.g., assets@2x.png for 2x scale)
+ * Asset Loading and Scaling:
+ * - Selects asset tier (@1x, @2x, @3x, @4x) based on ceil(dp_scale)
+ * - If exact match: uses assets as-is (e.g., dp_scale=2.0 with @2x)
+ * - If fractional: extracts and individually scales each asset using bilinear filtering
+ *   - Pill caps → exactly pill_px (for pixel-perfect GFX_blitPill rendering)
+ *   - Buttons/holes → exactly button_px
+ *   - Icons (brightness, volume, wifi) → proportional with even-pixel centering
+ *   - Battery assets → proportional scaling (internal offsets handled in GFX_blitBattery)
  * - Defines rectangles for each asset sprite in the texture atlas
  * - Maps asset IDs to RGB color values for fills
  *
- * Font initialization:
+ * Font Initialization:
  * - Opens 4 font sizes (large, medium, small, tiny)
  * - Applies bold style to all fonts
- * - Font sizes are scaled based on FIXED_SCALE
+ * - Font sizes scaled based on DP() macro (resolution-independent)
  *
  * @param mode Display mode (MODE_MAIN for launcher, MODE_MENU for in-game)
  * @return Pointer to main SDL screen surface
@@ -122,6 +372,11 @@ SDL_Surface* GFX_init(int mode) {
 	gfx.screen = PLAT_initVideo();
 	gfx.vsync = VSYNC_STRICT;
 	gfx.mode = mode;
+
+	// Initialize DP scaling system
+#ifdef SCREEN_DIAGONAL
+	UI_initLayout(gfx.screen->w, gfx.screen->h, SCREEN_DIAGONAL);
+#endif
 
 	RGB_WHITE = SDL_MapRGB(gfx.screen->format, TRIAD_WHITE);
 	RGB_BLACK = SDL_MapRGB(gfx.screen->format, TRIAD_BLACK);
@@ -144,43 +399,153 @@ SDL_Surface* GFX_init(int mode) {
 	asset_rgbs[ASSET_DOT] = RGB_LIGHT_GRAY;
 	asset_rgbs[ASSET_HOLE] = RGB_BLACK;
 
-	asset_rects[ASSET_WHITE_PILL] = (SDL_Rect){SCALE4(1, 1, 30, 30)};
-	asset_rects[ASSET_BLACK_PILL] = (SDL_Rect){SCALE4(33, 1, 30, 30)};
-	asset_rects[ASSET_DARK_GRAY_PILL] = (SDL_Rect){SCALE4(65, 1, 30, 30)};
-	asset_rects[ASSET_OPTION] = (SDL_Rect){SCALE4(97, 1, 20, 20)};
-	asset_rects[ASSET_BUTTON] = (SDL_Rect){SCALE4(1, 33, 20, 20)};
-	asset_rects[ASSET_PAGE_BG] = (SDL_Rect){SCALE4(64, 33, 15, 15)};
-	asset_rects[ASSET_STATE_BG] = (SDL_Rect){SCALE4(23, 54, 8, 8)};
-	asset_rects[ASSET_PAGE] = (SDL_Rect){SCALE4(39, 54, 6, 6)};
-	asset_rects[ASSET_BAR] = (SDL_Rect){SCALE4(33, 58, 4, 4)};
-	asset_rects[ASSET_BAR_BG] = (SDL_Rect){SCALE4(15, 55, 4, 4)};
-	asset_rects[ASSET_BAR_BG_MENU] = (SDL_Rect){SCALE4(85, 56, 4, 4)};
-	asset_rects[ASSET_UNDERLINE] = (SDL_Rect){SCALE4(85, 51, 3, 3)};
-	asset_rects[ASSET_DOT] = (SDL_Rect){SCALE4(33, 54, 2, 2)};
-	asset_rects[ASSET_BRIGHTNESS] = (SDL_Rect){SCALE4(23, 33, 19, 19)};
-	asset_rects[ASSET_VOLUME_MUTE] = (SDL_Rect){SCALE4(44, 33, 10, 16)};
-	asset_rects[ASSET_VOLUME] = (SDL_Rect){SCALE4(44, 33, 18, 16)};
-	asset_rects[ASSET_BATTERY] = (SDL_Rect){SCALE4(47, 51, 17, 10)};
-	asset_rects[ASSET_BATTERY_LOW] = (SDL_Rect){SCALE4(66, 51, 17, 10)};
-	asset_rects[ASSET_BATTERY_FILL] = (SDL_Rect){SCALE4(81, 33, 12, 6)};
-	asset_rects[ASSET_BATTERY_FILL_LOW] = (SDL_Rect){SCALE4(1, 55, 12, 6)};
-	asset_rects[ASSET_BATTERY_BOLT] = (SDL_Rect){SCALE4(81, 41, 12, 6)};
-	asset_rects[ASSET_SCROLL_UP] = (SDL_Rect){SCALE4(97, 23, 24, 6)};
-	asset_rects[ASSET_SCROLL_DOWN] = (SDL_Rect){SCALE4(97, 31, 24, 6)};
-	asset_rects[ASSET_WIFI] = (SDL_Rect){SCALE4(95, 39, 14, 10)};
-	asset_rects[ASSET_HOLE] = (SDL_Rect){SCALE4(1, 63, 20, 20)};
+	// Select asset tier based on dp_scale (use one tier higher for better quality)
+	// Available tiers: @1x, @2x, @3x, @4x
+	// Always downscale from a higher resolution for smoother antialiasing
+	int asset_scale = (int)ceilf(gfx_dp_scale) + 1;
+	if (asset_scale < 1)
+		asset_scale = 1;
+	if (asset_scale > 4)
+		asset_scale = 4;
 
+	// Load asset sprite sheet at selected tier
 	char asset_path[MAX_PATH];
-	sprintf(asset_path, RES_PATH "/assets@%ix.png", FIXED_SCALE);
+	sprintf(asset_path, RES_PATH "/assets@%ix.png", asset_scale);
 	if (!exists(asset_path))
 		LOG_info("missing assets, you're about to segfault dummy!\n");
-	gfx.assets = IMG_Load(asset_path);
+	SDL_Surface* loaded_assets = IMG_Load(asset_path);
+
+	// Define asset rectangles in the loaded sprite sheet (at asset_scale)
+	// Base coordinates are @1x, multiply by asset_scale for actual position
+#define ASSET_SCALE4(x, y, w, h)                                                                   \
+	((x) * asset_scale), ((y) * asset_scale), ((w) * asset_scale), ((h) * asset_scale)
+
+	asset_rects[ASSET_WHITE_PILL] = (SDL_Rect){ASSET_SCALE4(1, 1, 30, 30)};
+	asset_rects[ASSET_BLACK_PILL] = (SDL_Rect){ASSET_SCALE4(33, 1, 30, 30)};
+	asset_rects[ASSET_DARK_GRAY_PILL] = (SDL_Rect){ASSET_SCALE4(65, 1, 30, 30)};
+	asset_rects[ASSET_OPTION] = (SDL_Rect){ASSET_SCALE4(97, 1, 20, 20)};
+	asset_rects[ASSET_BUTTON] = (SDL_Rect){ASSET_SCALE4(1, 33, 20, 20)};
+	asset_rects[ASSET_PAGE_BG] = (SDL_Rect){ASSET_SCALE4(64, 33, 15, 15)};
+	asset_rects[ASSET_STATE_BG] = (SDL_Rect){ASSET_SCALE4(23, 54, 8, 8)};
+	asset_rects[ASSET_PAGE] = (SDL_Rect){ASSET_SCALE4(39, 54, 6, 6)};
+	asset_rects[ASSET_BAR] = (SDL_Rect){ASSET_SCALE4(33, 58, 4, 4)};
+	asset_rects[ASSET_BAR_BG] = (SDL_Rect){ASSET_SCALE4(15, 55, 4, 4)};
+	asset_rects[ASSET_BAR_BG_MENU] = (SDL_Rect){ASSET_SCALE4(85, 56, 4, 4)};
+	asset_rects[ASSET_UNDERLINE] = (SDL_Rect){ASSET_SCALE4(85, 51, 3, 3)};
+	asset_rects[ASSET_DOT] = (SDL_Rect){ASSET_SCALE4(33, 54, 2, 2)};
+	asset_rects[ASSET_BRIGHTNESS] = (SDL_Rect){ASSET_SCALE4(23, 33, 19, 19)};
+	asset_rects[ASSET_VOLUME_MUTE] = (SDL_Rect){ASSET_SCALE4(44, 33, 10, 16)};
+	asset_rects[ASSET_VOLUME] = (SDL_Rect){ASSET_SCALE4(44, 33, 18, 16)};
+	asset_rects[ASSET_BATTERY] = (SDL_Rect){ASSET_SCALE4(47, 51, 17, 10)};
+	asset_rects[ASSET_BATTERY_LOW] = (SDL_Rect){ASSET_SCALE4(66, 51, 17, 10)};
+	asset_rects[ASSET_BATTERY_FILL] = (SDL_Rect){ASSET_SCALE4(81, 33, 12, 6)};
+	asset_rects[ASSET_BATTERY_FILL_LOW] = (SDL_Rect){ASSET_SCALE4(1, 55, 12, 6)};
+	asset_rects[ASSET_BATTERY_BOLT] = (SDL_Rect){ASSET_SCALE4(81, 41, 12, 6)};
+	asset_rects[ASSET_SCROLL_UP] = (SDL_Rect){ASSET_SCALE4(97, 23, 24, 6)};
+	asset_rects[ASSET_SCROLL_DOWN] = (SDL_Rect){ASSET_SCALE4(97, 31, 24, 6)};
+	asset_rects[ASSET_WIFI] = (SDL_Rect){ASSET_SCALE4(95, 39, 14, 10)};
+	asset_rects[ASSET_HOLE] = (SDL_Rect){ASSET_SCALE4(1, 63, 20, 20)};
+
+	// Scale assets if dp_scale doesn't exactly match the loaded asset tier
+	// Uses per-asset scaling to ensure pixel-perfect pill caps and buttons
+	if (fabsf(gfx_dp_scale - (float)asset_scale) > 0.01f) {
+		float scale_ratio = gfx_dp_scale / (float)asset_scale;
+		int pill_px = DP(ui.pill_height);
+		int button_px = DP(ui.button_size);
+
+		// Calculate destination sheet dimensions (proportionally scaled)
+		int sheet_w = (int)(loaded_assets->w * scale_ratio + 0.5f);
+		int sheet_h = (int)(loaded_assets->h * scale_ratio + 0.5f);
+
+		// Create destination surface in RGBA8888 format
+		// Keep alpha channel throughout - SDL handles RGBA→RGB565 at final screen blit
+		gfx.assets = SDL_CreateRGBSurface(0, sheet_w, sheet_h, 32, RGBA_MASK_8888);
+
+		// Process each asset individually to ensure exact sizing
+		// Pills/buttons get exact dimensions, other assets scale proportionally
+		for (int i = 0; i < ASSET_COUNT; i++) {
+			// Source rectangle in the @Nx sheet
+			SDL_Rect src_rect = {asset_rects[i].x, asset_rects[i].y, asset_rects[i].w,
+			                     asset_rects[i].h};
+
+			// Destination position (scaled proportionally)
+			SDL_Rect dst_rect = {(int)(src_rect.x * scale_ratio + 0.5f),
+			                     (int)(src_rect.y * scale_ratio + 0.5f), 0, 0};
+
+			int target_w, target_h;
+
+			// Determine target dimensions based on asset type
+			// Strategy: Pills/buttons need exact sizes (GFX_blitPill relies on perfect dimensions)
+			// Other assets (icons, battery) use proportional scaling with bilinear smoothing
+			if (i == ASSET_WHITE_PILL || i == ASSET_BLACK_PILL || i == ASSET_DARK_GRAY_PILL) {
+				// Pill caps (30×30 @1x) → exactly pill_px
+				// GFX_blitPill splits these in half for left/right caps
+				target_w = target_h = pill_px;
+			} else if (i == ASSET_BUTTON || i == ASSET_HOLE || i == ASSET_OPTION) {
+				// Buttons/holes (20×20 @1x) → exactly button_px
+				target_w = target_h = button_px;
+			} else {
+				// All other assets: proportional scaling with rounding
+				target_w = (int)(src_rect.w * scale_ratio + 0.5f);
+				target_h = (int)(src_rect.h * scale_ratio + 0.5f);
+
+				// Ensure even pixel difference from pill for perfect centering
+				// Only applies to standalone icons that get centered in pills
+				if (i == ASSET_BRIGHTNESS || i == ASSET_VOLUME_MUTE || i == ASSET_VOLUME ||
+				    i == ASSET_WIFI) {
+					if ((pill_px - target_w) % 2 != 0)
+						target_w++;
+					if ((pill_px - target_h) % 2 != 0)
+						target_h++;
+				}
+				// Battery assets (outline, fill, bolt) use proportional scaling only
+				// Their internal positioning is handled by proportional offsets in GFX_blitBattery
+			}
+
+			// Extract this asset region from source sheet into RGBA8888 surface
+			SDL_Surface* extracted =
+			    SDL_CreateRGBSurface(0, src_rect.w, src_rect.h, 32, RGBA_MASK_8888);
+			// Disable alpha-blending to copy RGBA data directly (not blend with dst)
+			SDLX_SetAlpha(loaded_assets, 0, 0);
+			SDL_BlitSurface(loaded_assets, &src_rect, extracted, &(SDL_Rect){0, 0});
+			SDLX_SetAlpha(loaded_assets, SDL_SRCALPHA, 0); // Re-enable for later
+
+			// Scale this specific asset to its target size (keep in RGBA8888)
+			SDL_Surface* scaled = SDL_CreateRGBSurface(0, target_w, target_h, 32, RGBA_MASK_8888);
+			GFX_scaleBilinear(extracted, scaled); // Direct pixel copy preserves alpha
+
+			// Place the scaled asset into the destination sheet
+			// Disable alpha-blending to copy RGBA data directly
+			SDLX_SetAlpha(scaled, 0, 0);
+			SDL_BlitSurface(scaled, NULL, gfx.assets, &dst_rect);
+
+			// Update asset rectangle with new position and dimensions
+			asset_rects[i] = (SDL_Rect){dst_rect.x, dst_rect.y, target_w, target_h};
+
+			// Clean up temporary surfaces for this asset
+			SDL_FreeSurface(extracted);
+			SDL_FreeSurface(scaled);
+		}
+
+		// Done with source sheet
+		SDL_FreeSurface(loaded_assets);
+
+		LOG_info("GFX_init: Scaled %d assets from @%dx to dp_scale=%.2f (bilinear)\n", ASSET_COUNT,
+		         asset_scale, gfx_dp_scale);
+	} else {
+		// Perfect match, use assets as-is
+		gfx.assets = loaded_assets;
+		LOG_info("GFX_init: Using assets@%dx (exact match for dp_scale=%.2f)\n", asset_scale,
+		         gfx_dp_scale);
+	}
+
+#undef ASSET_SCALE4
 
 	TTF_Init();
-	font.large = TTF_OpenFont(FONT_PATH, SCALE1(FONT_LARGE));
-	font.medium = TTF_OpenFont(FONT_PATH, SCALE1(FONT_MEDIUM));
-	font.small = TTF_OpenFont(FONT_PATH, SCALE1(FONT_SMALL));
-	font.tiny = TTF_OpenFont(FONT_PATH, SCALE1(FONT_TINY));
+	font.large = TTF_OpenFont(FONT_PATH, DP(FONT_LARGE));
+	font.medium = TTF_OpenFont(FONT_PATH, DP(FONT_MEDIUM));
+	font.small = TTF_OpenFont(FONT_PATH, DP(FONT_SMALL));
+	font.tiny = TTF_OpenFont(FONT_PATH, DP(FONT_TINY));
 
 	TTF_SetFontStyle(font.large, TTF_STYLE_BOLD);
 	TTF_SetFontStyle(font.medium, TTF_STYLE_BOLD);
@@ -698,18 +1063,45 @@ void GFX_blitBattery(SDL_Surface* dst, const SDL_Rect* dst_rect) {
 		y = dst_rect->y;
 	}
 	SDL_Rect rect = asset_rects[ASSET_BATTERY];
-	x += (SCALE1(PILL_SIZE) - (rect.w + FIXED_SCALE)) / 2;
-	y += (SCALE1(PILL_SIZE) - rect.h) / 2;
+	int x_off = (DP(ui.pill_height) - rect.w) / 2;
+	int y_off = (DP(ui.pill_height) - rect.h) / 2;
+
+	static int logged = 0;
+	if (!logged) {
+		LOG_info("GFX_blitBattery: pill=%dpx, battery=%dx%d, offset=(%d,%d)\n", DP(ui.pill_height),
+		         rect.w, rect.h, x_off, y_off);
+		logged = 1;
+	}
+
+	x += x_off;
+	y += y_off;
+
+	// Battery fill/bolt offsets must scale with the actual battery asset size
+	// At @1x design: fill is 3px right, 2px down from battery top-left
+	// Scale this based on actual battery width: rect.w / 17 (17 = @1x battery width)
+	int fill_x_offset = (rect.w * 3 + 8) / 17; // (rect.w * 3/17), rounded
+	int fill_y_offset = (rect.h * 2 + 5) / 10; // (rect.h * 2/10), rounded
 
 	if (pwr.is_charging) {
+		if (!logged) {
+			LOG_info("Battery bolt: offset=(%d,%d) from battery corner\n", fill_x_offset,
+			         fill_y_offset);
+		}
 		GFX_blitAsset(ASSET_BATTERY, NULL, dst, &(SDL_Rect){x, y});
-		GFX_blitAsset(ASSET_BATTERY_BOLT, NULL, dst, &(SDL_Rect){x + SCALE1(3), y + SCALE1(2)});
+		GFX_blitAsset(ASSET_BATTERY_BOLT, NULL, dst,
+		              &(SDL_Rect){x + fill_x_offset, y + fill_y_offset});
 	} else {
 		int percent = pwr.charge;
 		GFX_blitAsset(percent <= 10 ? ASSET_BATTERY_LOW : ASSET_BATTERY, NULL, dst,
 		              &(SDL_Rect){x, y});
 
 		rect = asset_rects[ASSET_BATTERY_FILL];
+
+		if (!logged) {
+			LOG_info("Battery fill: %dx%d, offset=(%d,%d)\n", rect.w, rect.h, fill_x_offset,
+			         fill_y_offset);
+		}
+
 		SDL_Rect clip = rect;
 		clip.w *= percent;
 		clip.w /= 100;
@@ -719,7 +1111,7 @@ void GFX_blitBattery(SDL_Surface* dst, const SDL_Rect* dst_rect) {
 		clip.y = 0;
 
 		GFX_blitAsset(percent <= 20 ? ASSET_BATTERY_FILL_LOW : ASSET_BATTERY_FILL, &clip, dst,
-		              &(SDL_Rect){x + SCALE1(3) + clip.x, y + SCALE1(2)});
+		              &(SDL_Rect){x + fill_x_offset + clip.x, y + fill_y_offset});
 	}
 }
 
@@ -744,16 +1136,16 @@ int GFX_getButtonWidth(char* hint, char* button) {
 	int special_case = !strcmp(button, BRIGHTNESS_BUTTON_LABEL); // TODO: oof
 
 	if (strlen(button) == 1) {
-		button_width += SCALE1(BUTTON_SIZE);
+		button_width += DP(ui.button_size);
 	} else {
-		button_width += SCALE1(BUTTON_SIZE) / 2;
+		button_width += DP(ui.button_size) / 2;
 		TTF_SizeUTF8(special_case ? font.large : font.tiny, button, &width, NULL);
 		button_width += width;
 	}
-	button_width += SCALE1(BUTTON_MARGIN);
+	button_width += DP(ui.button_margin);
 
 	TTF_SizeUTF8(font.small, hint, &width, NULL);
-	button_width += width + SCALE1(BUTTON_MARGIN);
+	button_width += width + DP(ui.button_margin);
 	return button_width;
 }
 
@@ -780,38 +1172,42 @@ void GFX_blitButton(char* hint, char* button, SDL_Surface* dst, SDL_Rect* dst_re
 	if (strlen(button) == 1) {
 		GFX_blitAsset(ASSET_BUTTON, NULL, dst, dst_rect);
 
-		// label
+		// label - center text in button using DP-aware centering
+		// Bias vertical position up slightly to account for visual weight of glyphs
 		text = TTF_RenderUTF8_Blended(font.medium, button, COLOR_BUTTON_TEXT);
+		int offset_y =
+		    DP_CENTER_PX(ui.button_size, text->h) - DP(1); // Move up ~1dp for visual balance
 		SDL_BlitSurface(text, NULL, dst,
-		                &(SDL_Rect){dst_rect->x + (SCALE1(BUTTON_SIZE) - text->w) / 2,
-		                            dst_rect->y + (SCALE1(BUTTON_SIZE) - text->h) / 2});
-		ox += SCALE1(BUTTON_SIZE);
+		                &(SDL_Rect){dst_rect->x + DP_CENTER_PX(ui.button_size, text->w),
+		                            dst_rect->y + offset_y});
+		ox += DP(ui.button_size);
 		SDL_FreeSurface(text);
 	} else {
 		text = TTF_RenderUTF8_Blended(special_case ? font.large : font.tiny, button,
 		                              COLOR_BUTTON_TEXT);
 		GFX_blitPill(ASSET_BUTTON, dst,
-		             &(SDL_Rect){dst_rect->x, dst_rect->y, SCALE1(BUTTON_SIZE) / 2 + text->w,
-		                         SCALE1(BUTTON_SIZE)});
-		ox += SCALE1(BUTTON_SIZE) / 4;
+		             &(SDL_Rect){dst_rect->x, dst_rect->y, DP(ui.button_size) / 2 + text->w,
+		                         DP(ui.button_size)});
+		ox += DP(ui.button_size) / 4;
 
-		int oy = special_case ? SCALE1(-2) : 0;
+		int oy = special_case ? DP(-2) : 0;
 		SDL_BlitSurface(text, NULL, dst,
 		                &(SDL_Rect){ox + dst_rect->x,
-		                            oy + dst_rect->y + (SCALE1(BUTTON_SIZE) - text->h) / 2, text->w,
-		                            text->h});
+		                            oy + dst_rect->y + DP_CENTER_PX(ui.button_size, text->h),
+		                            text->w, text->h});
 		ox += text->w;
-		ox += SCALE1(BUTTON_SIZE) / 4;
+		ox += DP(ui.button_size) / 4;
 		SDL_FreeSurface(text);
 	}
 
-	ox += SCALE1(BUTTON_MARGIN);
+	ox += DP(ui.button_margin);
 
 	// hint text
 	text = TTF_RenderUTF8_Blended(font.small, hint, COLOR_WHITE);
 	SDL_BlitSurface(text, NULL, dst,
-	                &(SDL_Rect){ox + dst_rect->x, dst_rect->y + (SCALE1(BUTTON_SIZE) - text->h) / 2,
-	                            text->w, text->h});
+	                &(SDL_Rect){ox + dst_rect->x,
+	                            dst_rect->y + DP_CENTER_PX(ui.button_size, text->h), text->w,
+	                            text->h});
 	SDL_FreeSurface(text);
 }
 
@@ -842,7 +1238,7 @@ void GFX_blitMessage(TTF_Font* ttf_font, char* msg, SDL_Surface* dst, const SDL_
 	if (row_count == 0)
 		return;
 
-	int rendered_height = SCALE1(LINE_HEIGHT) * row_count;
+	int rendered_height = DP(LINE_HEIGHT) * row_count;
 	int y = dst_rect->y;
 	y += (dst_rect->h - rendered_height) / 2;
 
@@ -867,7 +1263,7 @@ void GFX_blitMessage(TTF_Font* ttf_font, char* msg, SDL_Surface* dst, const SDL_
 			SDL_BlitSurface(text, NULL, dst, &(SDL_Rect){x, y});
 			SDL_FreeSurface(text);
 		}
-		y += SCALE1(LINE_HEIGHT);
+		y += DP(LINE_HEIGHT);
 	}
 }
 
@@ -890,11 +1286,11 @@ int GFX_blitHardwareGroup(SDL_Surface* dst, int show_setting) {
 	int ow = 0;
 
 	if (show_setting && !GetHDMI()) {
-		ow = SCALE1(PILL_SIZE + SETTINGS_WIDTH + 10 + 4);
-		ox = dst->w - SCALE1(PADDING) - ow;
-		oy = SCALE1(PADDING);
+		ow = DP(ui.pill_height + ui.settings_width + ui.padding + 4);
+		ox = ui.screen_width_px - DP(ui.padding) - ow;
+		oy = DP(ui.padding);
 		GFX_blitPill(gfx.mode == MODE_MAIN ? ASSET_DARK_GRAY_PILL : ASSET_BLACK_PILL, dst,
-		             &(SDL_Rect){ox, oy, ow, SCALE1(PILL_SIZE)});
+		             &(SDL_Rect){ox, oy, ow, DP(ui.pill_height)});
 
 		int setting_value;
 		int setting_min;
@@ -911,40 +1307,40 @@ int GFX_blitHardwareGroup(SDL_Surface* dst, int show_setting) {
 
 		int asset = show_setting == 1 ? ASSET_BRIGHTNESS
 		                              : (setting_value > 0 ? ASSET_VOLUME : ASSET_VOLUME_MUTE);
-		int ax = ox + (show_setting == 1 ? SCALE1(6) : SCALE1(8));
-		int ay = oy + (show_setting == 1 ? SCALE1(5) : SCALE1(7));
+		int ax = ox + (show_setting == 1 ? DP(6) : DP(8));
+		int ay = oy + (show_setting == 1 ? DP(5) : DP(7));
 		GFX_blitAsset(asset, NULL, dst, &(SDL_Rect){ax, ay});
 
-		ox += SCALE1(PILL_SIZE);
-		oy += SCALE1((PILL_SIZE - SETTINGS_SIZE) / 2);
+		ox += DP(ui.pill_height);
+		oy += (DP(ui.pill_height) - DP(ui.settings_size)) / 2;
 		GFX_blitPill(gfx.mode == MODE_MAIN ? ASSET_BAR_BG : ASSET_BAR_BG_MENU, dst,
-		             &(SDL_Rect){ox, oy, SCALE1(SETTINGS_WIDTH), SCALE1(SETTINGS_SIZE)});
+		             &(SDL_Rect){ox, oy, DP(ui.settings_width), DP(ui.settings_size)});
 
 		float percent = ((float)(setting_value - setting_min) / (setting_max - setting_min));
 		if (show_setting == 1 || setting_value > 0) {
 			GFX_blitPill(
 			    ASSET_BAR, dst,
-			    &(SDL_Rect){ox, oy, SCALE1(SETTINGS_WIDTH) * percent, SCALE1(SETTINGS_SIZE)});
+			    &(SDL_Rect){ox, oy, DP(ui.settings_width) * percent, DP(ui.settings_size)});
 		}
 	} else {
 		// TODO: handle wifi
 		int show_wifi = PLAT_isOnline(); // NOOOOO! not every frame!
 
-		int ww = SCALE1(PILL_SIZE - 3);
-		ow = SCALE1(PILL_SIZE);
+		int ww = DP(ui.pill_height - 3);
+		ow = DP(ui.pill_height);
 		if (show_wifi)
 			ow += ww;
 
-		ox = dst->w - SCALE1(PADDING) - ow;
-		oy = SCALE1(PADDING);
+		ox = ui.screen_width_px - DP(ui.padding) - ow;
+		oy = DP(ui.padding);
 		GFX_blitPill(gfx.mode == MODE_MAIN ? ASSET_DARK_GRAY_PILL : ASSET_BLACK_PILL, dst,
-		             &(SDL_Rect){ox, oy, ow, SCALE1(PILL_SIZE)});
+		             &(SDL_Rect){ox, oy, ow, DP(ui.pill_height)});
 		if (show_wifi) {
 			SDL_Rect rect = asset_rects[ASSET_WIFI];
 			int x = ox;
 			int y = oy;
-			x += (SCALE1(PILL_SIZE) - rect.w) / 2;
-			y += (SCALE1(PILL_SIZE) - rect.h) / 2;
+			x += (DP(ui.pill_height) - rect.w) / 2;
+			y += (DP(ui.pill_height) - rect.h) / 2;
 
 			GFX_blitAsset(ASSET_WIFI, NULL, dst, &(SDL_Rect){x, y});
 			ox += ww;
@@ -1005,8 +1401,8 @@ int GFX_blitButtonGroup(char** pairs, int primary, SDL_Surface* dst, int align_r
 	int w = 0; // individual button dimension
 	int h = 0; // hints index
 	ow = 0; // full pill width
-	ox = align_right ? dst->w - SCALE1(PADDING) : SCALE1(PADDING);
-	oy = dst->h - SCALE1(PADDING + PILL_SIZE);
+	ox = align_right ? dst->w - DP(ui.padding) : DP(ui.padding);
+	oy = dst->h - DP(ui.padding + ui.pill_height);
 
 	for (int i = 0; i < 2; i++) {
 		if (!pairs[i * 2])
@@ -1021,20 +1417,20 @@ int GFX_blitButtonGroup(char** pairs, int primary, SDL_Surface* dst, int align_r
 		hints[h].button = button;
 		hints[h].ow = w;
 		h += 1;
-		ow += SCALE1(BUTTON_MARGIN) + w;
+		ow += DP(ui.button_margin) + w;
 	}
 
-	ow += SCALE1(BUTTON_MARGIN);
+	ow += DP(ui.button_margin);
 	if (align_right)
 		ox -= ow;
 	GFX_blitPill(gfx.mode == MODE_MAIN ? ASSET_DARK_GRAY_PILL : ASSET_BLACK_PILL, dst,
-	             &(SDL_Rect){ox, oy, ow, SCALE1(PILL_SIZE)});
+	             &(SDL_Rect){ox, oy, ow, DP(ui.pill_height)});
 
-	ox += SCALE1(BUTTON_MARGIN);
-	oy += SCALE1(BUTTON_MARGIN);
+	ox += DP(ui.button_margin);
+	oy += DP(ui.button_margin);
 	for (int i = 0; i < h; i++) {
 		GFX_blitButton(hints[i].hint, hints[i].button, dst, &(SDL_Rect){ox, oy});
-		ox += hints[i].ow + SCALE1(BUTTON_MARGIN);
+		ox += hints[i].ow + DP(ui.button_margin);
 	}
 	return ow;
 }
@@ -1945,6 +2341,43 @@ int VIB_getStrength(void) {
 // Power management - Battery, sleep, brightness, volume
 ///////////////////////////////
 
+// Overlay surface for fallback implementation (used if platform doesn't provide its own)
+static SDL_Surface* fallback_overlay = NULL;
+
+/**
+ * Fallback overlay initialization for simple platforms.
+ *
+ * Creates a standard SDL surface for the battery warning overlay.
+ * Platforms with hardware overlays (e.g., rg35xx) provide their own implementation.
+ *
+ * @return SDL surface for overlay
+ */
+FALLBACK_IMPLEMENTATION SDL_Surface* PLAT_initOverlay(void) {
+	int overlay_size = DP(ui.pill_height);
+	fallback_overlay = SDL_CreateRGBSurface(SDL_SWSURFACE, overlay_size, overlay_size, 16,
+	                                        0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000); // ARGB
+	return fallback_overlay;
+}
+
+/**
+ * Fallback overlay cleanup.
+ */
+FALLBACK_IMPLEMENTATION void PLAT_quitOverlay(void) {
+	if (fallback_overlay) {
+		SDL_FreeSurface(fallback_overlay);
+		fallback_overlay = NULL;
+	}
+}
+
+/**
+ * Fallback overlay enable/disable (no-op for software compositing).
+ *
+ * @param enable Unused - software overlays are always composited
+ */
+FALLBACK_IMPLEMENTATION void PLAT_enableOverlay(int enable) {
+	(void)enable; // Overlay composited in software, no hardware control needed
+}
+
 /**
  * Initializes the low battery warning overlay.
  *
@@ -2237,10 +2670,8 @@ void PWR_powerOff(void) {
 
 		// LOG_info("PWR_powerOff %s (%ix%i)\n", gfx.screen, gfx.screen->w, gfx.screen->h);
 
-		// TODO: for some reason screen's dimensions end up being 0x0 in GFX_blitMessage...
 		PLAT_clearVideo(gfx.screen);
-		GFX_blitMessage(font.large, msg, gfx.screen,
-		                &(SDL_Rect){0, 0, gfx.screen->w, gfx.screen->h}); //, NULL);
+		GFX_blitMessage_DP(font.large, msg, gfx.screen, 0, 0, ui.screen_width, ui.screen_height);
 		GFX_flip(gfx.screen);
 		PLAT_powerOff();
 	}
