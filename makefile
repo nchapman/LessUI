@@ -151,6 +151,10 @@ system:
 	cp ./workspace/all/minarch/build/$(PLATFORM)/minarch.elf ./build/SYSTEM/$(PLATFORM)/bin/
 	cp ./workspace/all/syncsettings/build/$(PLATFORM)/syncsettings.elf ./build/SYSTEM/$(PLATFORM)/bin/
 	cp ./workspace/all/say/build/$(PLATFORM)/say.elf ./build/SYSTEM/$(PLATFORM)/bin/
+	# Copy utils (available to all paks)
+	cp ./workspace/all/utils/minui-keyboard/build/$(PLATFORM)/minui-keyboard ./build/SYSTEM/$(PLATFORM)/bin/
+	cp ./workspace/all/utils/minui-list/build/$(PLATFORM)/minui-list ./build/SYSTEM/$(PLATFORM)/bin/
+	cp ./workspace/all/utils/minui-presenter/build/$(PLATFORM)/minui-presenter ./build/SYSTEM/$(PLATFORM)/bin/
 	# Construct tool paks from workspace/all/paks/
 	# For each pak: create directory, copy launch.sh, pak.json, resources, and binary
 	@for pak_dir in ./workspace/all/paks/*/; do \
@@ -216,6 +220,7 @@ clean:
 	rm -rf workspace/all/minui/build
 	rm -rf workspace/all/minarch/build
 	rm -rf workspace/all/paks/*/build
+	rm -rf workspace/all/utils/*/build
 	rm -rf workspace/all/minput/build
 	rm -rf workspace/all/say/build
 	rm -rf workspace/all/syncsettings/build

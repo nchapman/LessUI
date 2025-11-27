@@ -21,6 +21,9 @@ all:
 	cd ./all/minui/ && make
 	cd ./all/minarch/ && make
 	cd ./all/paks/ && make
+	cd ./all/utils/minui-keyboard/ && make
+	cd ./all/utils/minui-list/ && make
+	cd ./all/utils/minui-presenter/ && make
 	cd ./all/minput/ && make
 	cd ./all/syncsettings/ && make
 	cd ./all/say/ && make
@@ -32,6 +35,9 @@ clean:
 	cd ./all/minui/ && make clean
 	cd ./all/minarch/ && make clean
 	cd ./all/paks/ && make clean
+	cd ./all/utils/minui-keyboard/ && make clean
+	cd ./all/utils/minui-list/ && make clean
+	cd ./all/utils/minui-presenter/ && make clean
 	cd ./all/minput/ && make clean
 	cd ./all/syncsettings/ && make clean
 	cd ./all/say/ && make clean
