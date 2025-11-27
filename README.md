@@ -4,7 +4,9 @@
 
 LessUI is a focused, custom launcher and libretro frontend for [a variety of retro handhelds](#supported-devices).
 
-<img src="github/minui-main.png" width=320 /> <img src="github/minui-menu-gbc.png" width=320 />
+<img src="docs/images/screenshots/minui-main.png" width=320 /> <img src="docs/images/screenshots/minui-menu-gbc.png" width=320 />
+
+*See [all screenshots](docs/SCREENSHOTS.md)*
 
 ## Features
 
