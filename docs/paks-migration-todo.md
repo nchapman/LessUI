@@ -13,6 +13,7 @@ This document tracks the migration of existing paks to the new unified architect
   - minui-keyboard (text input widget)
   - minui-list (settings/menu widget) - upgraded to DP system
   - minui-presenter (message display widget) - upgraded to DP system
+  - jq (JSON processor) - downloads prebuilt binaries per platform
   - All deployed to `build/SYSTEM/<platform>/bin/` (available to all paks)
 
 - [x] **Input** - Migrated to `workspace/all/paks/Input/`
@@ -43,6 +44,20 @@ This document tracks the migration of existing paks to the new unified architect
   - Removed old skeleton copies (7 platforms)
   - Removed platform-specific makefile.copy rules
 
+- [x] **Wifi** - Migrated to `workspace/all/paks/Wifi/`
+  - Based on Jose Gonzalez's minui-wifi-pak (third-party integration)
+  - Supports 5 platforms: miyoomini, my282, my355, rg35xxplus, tg5040
+  - Full UI using minui-keyboard, minui-list, minui-presenter, jq (all system utils)
+  - Helper scripts: service-on, service-off, wifi-enabled, on-boot
+  - Platform-specific assets:
+    - `bin/miyoomini/iw` - WiFi scanning tool
+    - `lib/miyoomini/` - Required shared libraries (libnl, libssl, etc.)
+    - `res/miyoomini/8188fu.ko` - WiFi kernel module for Miyoo Mini Plus
+  - Platform-specific wpa_supplicant.conf templates
+  - rg35xxplus uses netplan.yaml for systemd-networkd
+  - Boot-time auto-start via auto.sh hook
+  - Successfully validates third-party pak integration pattern
+
 ## Pending Migrations
 
 ### High Priority - Native Code Paks
@@ -54,12 +69,6 @@ None remaining!
 None remaining!
 
 ### Low Priority - Platform-Specific Paks
-
-- [ ] **WiFi** - `skeleton/EXTRAS/Tools/rgb30/Wi-Fi.pak/`
-  - Currently rgb30-only
-  - Expand to support multiple platforms
-  - Use minui-list/minui-presenter for UI
-  - Tests bin/, lib/, res/ with platform-specific assets
 
 - [ ] **ADBD** - `skeleton/EXTRAS/Tools/miyoomini/ADBD.pak/`
   - miyoomini-specific (WiFi/USB debug)
@@ -91,11 +100,11 @@ None remaining!
 
 ## Next Recommended Action
 
-**All high and medium priority tool paks are now migrated!**
+**All high and medium priority tool paks are now migrated, including WiFi!**
 
-Remaining paks are platform-specific (WiFi, ADBD, SSH, Splore, etc.). These can be migrated as needed or left as platform-specific since they only apply to 1-2 platforms each.
+Remaining paks are platform-specific (ADBD, SSH, Splore, etc.). These can be migrated as needed or left as platform-specific since they only apply to 1-2 platforms each.
 
 Consider:
-1. WiFi pak - Most complex remaining, would benefit from unified approach
-2. Emulator paks - Evaluate if template system should migrate to unified paks
-3. Third-party pak documentation - Make it easy for external developers to contribute paks
+1. Emulator paks - Evaluate if template system should migrate to unified paks
+2. Third-party pak documentation - Make it easy for external developers to contribute paks
+3. Dependency management - Auto-download binaries like jq, syncthing, etc.

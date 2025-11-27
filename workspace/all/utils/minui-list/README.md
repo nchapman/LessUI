@@ -21,6 +21,8 @@ make build PLATFORM=miyoomini  # Builds as part of workspace/all/utils/
 
 **Original source:** https://github.com/josegonzalez/minui-list
 
+**Forked from commit:** `f172a8efd0f79bf48b2b81d6a8f881580002cce4`
+
 ## Requirements
 
 - A minui union toolchain

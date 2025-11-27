@@ -155,6 +155,7 @@ system:
 	cp ./workspace/all/utils/minui-keyboard/build/$(PLATFORM)/minui-keyboard ./build/SYSTEM/$(PLATFORM)/bin/
 	cp ./workspace/all/utils/minui-list/build/$(PLATFORM)/minui-list ./build/SYSTEM/$(PLATFORM)/bin/
 	cp ./workspace/all/utils/minui-presenter/build/$(PLATFORM)/minui-presenter ./build/SYSTEM/$(PLATFORM)/bin/
+	cp ./workspace/all/utils/jq/build/$(PLATFORM)/jq ./build/SYSTEM/$(PLATFORM)/bin/
 	# Construct tool paks from workspace/all/paks/
 	# For each pak: create directory, copy launch.sh, pak.json, resources, and binary
 	@for pak_dir in ./workspace/all/paks/*/; do \

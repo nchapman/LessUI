@@ -24,6 +24,7 @@ all:
 	cd ./all/utils/minui-keyboard/ && make
 	cd ./all/utils/minui-list/ && make
 	cd ./all/utils/minui-presenter/ && make
+	cd ./all/utils/jq/ && make
 	cd ./all/syncsettings/ && make
 	cd ./all/say/ && make
 	cd ./$(PLATFORM) && make
@@ -37,6 +38,7 @@ clean:
 	cd ./all/utils/minui-keyboard/ && make clean
 	cd ./all/utils/minui-list/ && make clean
 	cd ./all/utils/minui-presenter/ && make clean
+	cd ./all/utils/jq/ && make clean
 	cd ./all/syncsettings/ && make clean
 	cd ./all/say/ && make clean
 	cd ./$(PLATFORM) && make clean

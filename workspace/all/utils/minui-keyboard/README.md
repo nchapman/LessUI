@@ -19,6 +19,8 @@ make build PLATFORM=miyoomini  # Builds as part of workspace/all/utils/
 
 **Original source:** https://github.com/josegonzalez/minui-keyboard
 
+**Forked from commit:** `f4a88073aa64479bc6137ad49362b024ca34c6b1`
+
 ## Requirements
 
 - A minui union toolchain

@@ -22,6 +22,8 @@ make build PLATFORM=miyoomini  # Builds as part of workspace/all/utils/
 
 **Original source:** https://github.com/josegonzalez/minui-presenter
 
+**Forked from commit:** `611a1271bb3d52cd9f19f4895042d0aef419c2a4`
+
 ## Requirements
 
 - A minui union toolchain
