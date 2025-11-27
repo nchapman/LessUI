@@ -158,25 +158,40 @@ system:
 	cp ./workspace/all/utils/jq/build/$(PLATFORM)/jq ./build/SYSTEM/$(PLATFORM)/bin/
 	# Construct tool paks from workspace/all/paks/
 	# For each pak: create directory, copy launch.sh, pak.json, resources, and binary
-	@for pak_dir in ./workspace/all/paks/*/; do \
+	for pak_dir in ./workspace/all/paks/*/; do \
 		[ -d "$$pak_dir" ] || continue; \
 		pak_name=$$(basename "$$pak_dir"); \
 		[ -f "$$pak_dir/pak.json" ] || continue; \
 		if jq -e '.platforms | index("$(PLATFORM)") or index("all")' "$$pak_dir/pak.json" > /dev/null 2>&1; then \
 			echo "  Constructing $${pak_name}.pak for $(PLATFORM)"; \
-			output_dir="./build/EXTRAS/Tools/$(PLATFORM)/$${pak_name}.pak"; \
+			output_dir="./build/SYSTEM/$(PLATFORM)/paks/$${pak_name}.pak"; \
 			mkdir -p "$$output_dir"; \
 			[ -f "$$pak_dir/launch.sh" ] && cp "$$pak_dir/launch.sh" "$$output_dir/" && chmod +x "$$output_dir/launch.sh"; \
 			[ -f "$$pak_dir/pak.json" ] && cp "$$pak_dir/pak.json" "$$output_dir/"; \
 			[ -d "$$pak_dir/res" ] && cp -r "$$pak_dir/res" "$$output_dir/"; \
 			[ -d "$$pak_dir/bin" ] && cp -r "$$pak_dir/bin" "$$output_dir/"; \
 			[ -d "$$pak_dir/lib" ] && cp -r "$$pak_dir/lib" "$$output_dir/"; \
-			[ -d "$$pak_dir/$(PLATFORM)" ] && cp -r "$$pak_dir/$(PLATFORM)/"* "$$output_dir/"; \
+			if [ -d "$$pak_dir/$(PLATFORM)" ]; then \
+				set +e; \
+				cp -r "$$pak_dir/$(PLATFORM)/"* "$$output_dir/" 2>/dev/null; \
+				set -e; \
+			fi; \
 			for elf in "$$pak_dir/build/$(PLATFORM)/"*.elf; do \
-				[ -f "$$elf" ] && cp "$$elf" "$$output_dir/"; \
+				[ -f "$$elf" ] && cp "$$elf" "$$output_dir/" || true; \
 			done; \
-		fi \
-	done
+		fi; \
+	done; true
+	# Copy platform-specific binaries to paks (after pak construction)
+	@if [ "$(PLATFORM)" = "rg35xxplus" ]; then \
+		mkdir -p ./build/SYSTEM/rg35xxplus/paks/Apply\ Panel\ Fix.pak/bin; \
+		mkdir -p ./build/SYSTEM/rg35xxplus/paks/Swap\ Menu.pak/bin; \
+		cp ./workspace/rg35xxplus/other/dtc/dtc ./build/SYSTEM/rg35xxplus/paks/Apply\ Panel\ Fix.pak/bin/; \
+		cp ./workspace/rg35xxplus/other/dtc/dtc ./build/SYSTEM/rg35xxplus/paks/Swap\ Menu.pak/bin/; \
+	fi
+	@if [ "$(PLATFORM)" = "my282" ]; then \
+		mkdir -p ./build/SYSTEM/my282/paks/Remove\ Loading.pak; \
+		cp -r ./workspace/my282/other/squashfs/output/* ./build/SYSTEM/my282/paks/Remove\ Loading.pak/; \
+	fi
 
 # Deploy shared libretro cores from minarch-cores GitHub releases
 # Downloads and extracts cores for both ARM architectures
@@ -249,10 +264,9 @@ setup: name
 	cd ./build && find . -type f -name '*.meta' -delete
 	echo $(BUILD_HASH) > ./workspace/hash.txt
 	
-	# Copy READMEs to workspace for formatting (uses Linux fmt in Docker)
+	# Copy README to workspace for formatting (uses Linux fmt in Docker)
 	mkdir -p ./workspace/readmes
 	cp ./skeleton/BASE/README.md ./workspace/readmes/BASE-in.txt
-	cp ./skeleton/EXTRAS/README.md ./workspace/readmes/EXTRAS-in.txt
 
 	# Copy boot assets to workspace for platforms that build them in Docker
 	mkdir -p ./workspace/rg35xx/boot
@@ -326,10 +340,9 @@ endif
 package: tidy
 	# ----------------------------------------------------
 	# Package everything into distributable ZIPs
-		
-	# Move formatted READMEs from workspace to build
+
+	# Move formatted README from workspace to build
 	cp ./workspace/readmes/BASE-out.txt ./build/BASE/README.txt
-	cp ./workspace/readmes/EXTRAS-out.txt ./build/EXTRAS/README.txt
 	rm -rf ./workspace/readmes
 	
 	cd ./build/SYSTEM && echo "$(RELEASE_NAME)\n$(BUILD_HASH)" > version.txt
@@ -346,7 +359,6 @@ package: tidy
 
 	# TODO: can I just add everything in BASE to zip?
 	cd ./build/BASE && zip -r ../../releases/$(RELEASE_NAME)-base.zip Bios Roms Saves miyoo miyoo354 trimui rg35xx rg35xxplus miyoo355 magicx miyoo285 em_ui.sh LessUI.zip README.txt
-	cd ./build/EXTRAS && zip -r ../../releases/$(RELEASE_NAME)-extras.zip Bios Roms Saves Tools README.txt
 	echo "$(RELEASE_NAME)" > ./build/latest.txt
 	
 ###########################################################

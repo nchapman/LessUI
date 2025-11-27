@@ -6,10 +6,11 @@ This document describes the unified pak architecture for LessUI, enabling self-c
 
 ### Previous Problems (Solved)
 
-1. **Duplication**: Tool paks like `Clock.pak` had `launch.sh` duplicated 11 times across `skeleton/EXTRAS/Tools/<platform>/`
-2. **Scattered code**: Native source lived in `workspace/all/clock/` while pak scaffolding lived in `skeleton/EXTRAS/Tools/`
+1. **Duplication**: Tool paks like `Clock.pak` had `launch.sh` duplicated 11 times across platforms
+2. **Scattered code**: Native source lived in separate directories while pak scaffolding lived elsewhere
 3. **No single source of truth**: Updates required touching many files
 4. **Inconsistencies**: Minor differences crept in (trailing newlines, debug comments)
+5. **EXTRAS complexity**: Separate release package created confusion for users
 
 ### Solution
 
@@ -381,7 +382,7 @@ make build PLATFORM=miyoomini
 make system PLATFORM=miyoomini
   └── For each pak in workspace/all/paks/:
       ├── Check pak.json for platform compatibility
-      ├── Create build/EXTRAS/Tools/<platform>/<pak>.pak/
+      ├── Create build/SYSTEM/<platform>/paks/<pak>.pak/
       └── Copy launch.sh, pak.json, res/, bin/, lib/, AND compiled binary
 ```
 
@@ -408,8 +409,8 @@ All high and medium priority tool paks have been successfully migrated:
 |-----|------|--------------|--------------|------------|
 | **Clock** | Native | `workspace/all/clock/` | `workspace/all/paks/Clock/src/` | First migration, 11 duplicates eliminated |
 | **Input** | Native | `workspace/all/minput/` | `workspace/all/paks/Input/src/` | Second native pak, validates pattern |
-| **Bootlogo** | Hybrid | `skeleton/EXTRAS/Tools/*/Bootlogo.pak/` (×7) | `workspace/all/paks/Bootlogo/` | Native for miyoomini, shell for others; platform-specific resources; minui-presenter integration |
-| **Files** | Platform-Specific Binaries | `skeleton/EXTRAS/Tools/*/Files.pak/` (×10) | `workspace/all/paks/Files/` | Multiple file managers (DinguxCommander, 351Files); `bin/<platform>/` pattern |
+| **Bootlogo** | Hybrid | (was duplicated ×7) | `workspace/all/paks/Bootlogo/` | Native for miyoomini, shell for others; platform-specific resources; minui-presenter integration |
+| **Files** | Platform-Specific Binaries | (was duplicated ×10) | `workspace/all/paks/Files/` | Multiple file managers (DinguxCommander, 351Files); `bin/<platform>/` pattern |
 
 ### Migration Steps (Template)
 
@@ -421,8 +422,7 @@ For future pak migrations:
 4. **Create pak.json**: Define name, platforms, build configuration
 5. **Create launch.sh**: Single cross-platform launcher (use `case "$PLATFORM"` for branching)
 6. **Update makefiles**: Remove old build/copy rules from workspace/makefile and makefile.copy files
-7. **Remove duplicates**: `rm -rf skeleton/EXTRAS/Tools/*/<Name>.pak`
-8. **Test**: `make clean && make setup && make build PLATFORM=<platform> && make system PLATFORM=<platform>`
+7. **Test**: `make clean && make setup && make build PLATFORM=<platform> && make system PLATFORM=<platform>`
 
 ## Relationship to Emulator Paks
 

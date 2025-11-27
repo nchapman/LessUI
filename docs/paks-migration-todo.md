@@ -2,7 +2,11 @@
 
 This document tracks the migration of existing paks to the new unified architecture (`workspace/all/paks/`).
 
-## Completed ✅
+## Completed
+
+All paks have been migrated! The EXTRAS concept has been removed from the build system.
+
+### Tool Paks
 
 - [x] **Clock** - Migrated to `workspace/all/paks/Clock/`
   - Single source of truth for launch.sh (was duplicated 11 times)
@@ -58,35 +62,72 @@ This document tracks the migration of existing paks to the new unified architect
   - Boot-time auto-start via auto.sh hook
   - Successfully validates third-party pak integration pattern
 
-## Pending Migrations
+### Platform-Specific Paks (formerly in EXTRAS)
 
-### High Priority - Native Code Paks
-
-None remaining!
-
-### Medium Priority - Shell Script Paks
-
-None remaining!
-
-### Low Priority - Platform-Specific Paks
-
-- [ ] **ADBD** - `skeleton/EXTRAS/Tools/miyoomini/ADBD.pak/`
+- [x] **ADBD** - Migrated to `workspace/all/paks/ADBD/`
   - miyoomini-specific (WiFi/USB debug)
+  - Includes adbd binary, 8188fu.ko kernel module, libcrypto
 
-- [ ] **Enable SSH** - `skeleton/EXTRAS/Tools/rg35xxplus/Enable SSH.pak/`
+- [x] **IP** - Migrated to `workspace/all/paks/IP/`
+  - miyoomini-specific (displays device IP address)
+  - Shell-only pak using say.elf
+
+- [x] **Remove Loading** - Migrated to `workspace/all/paks/Remove Loading/`
+  - Unified pak supporting miyoomini, my282, tg5040
+  - Platform branching via case/esac in launch.sh
+  - Platform-specific squashfs tools for miyoomini/my282
+
+- [x] **Reset Stick** - Migrated to `workspace/all/paks/Reset Stick/`
+  - my282-specific (reset analog stick calibration)
+  - Shell-only pak
+
+- [x] **Enable SSH** - Migrated to `workspace/all/paks/Enable SSH/`
   - rg35xxplus-specific
+  - Shell-only pak using apt-get
 
-- [ ] **Splore** - `skeleton/EXTRAS/Tools/rgb30/Splore.pak/`
-  - rgb30-specific (PICO-8 launcher)
+- [x] **Apply Panel Fix** - Migrated to `workspace/all/paks/Apply Panel Fix/`
+  - rg35xxplus-specific (DTB patching)
+  - Uses dtc tool compiled per-platform
 
-- [ ] **Other platform-specific paks** - Various Remove Loading, IP, etc.
+- [x] **Swap Menu** - Migrated to `workspace/all/paks/Swap Menu/`
+  - rg35xxplus-specific (swap Menu/Select buttons)
+  - Uses dtc tool compiled per-platform
 
-## Future Enhancements
+- [x] **Splore** - Migrated to `workspace/all/paks/Splore/`
+  - rgb30-specific (PICO-8 native launcher)
+  - Shell-only pak
+
+- [x] **Simple Wifi** - Migrated to `workspace/all/paks/Simple Wifi/`
+  - rgb30-specific (simple WiFi toggle using stock firmware utilities)
+  - Shell-only pak - kept separate from main Wifi pak due to incompatible APIs
+  - Uses wifictl/get_setting/set_setting (RGB30 stock firmware)
+
+### Emulator Paks
 
 - [x] **Emulator paks** - Migrated from `skeleton/TEMPLATES/minarch-paks/` to `workspace/all/paks/Emus/`
   - Template system preserved (works well for uniform emulator paks)
   - All pak sources now unified in `workspace/all/paks/`
   - cores-override also moved to `workspace/all/paks/Emus/cores-override/`
+
+## Build System Changes
+
+The EXTRAS concept has been completely removed:
+
+1. **skeleton/EXTRAS/** - Deleted entirely
+   - Bios/Roms/Saves directories were already in skeleton/BASE/
+   - Tools/ migrated to workspace/all/paks/
+
+2. **Makefile changes**:
+   - Tool paks now deploy to `build/SYSTEM/<platform>/paks/` (not EXTRAS/Tools)
+   - No more extras.zip - single unified base.zip release
+   - README formatting simplified (no EXTRAS README)
+
+3. **Platform makefile.copy files**:
+   - Updated to copy compiled tools to new paks location
+   - rg35xxplus: dtc -> build/SYSTEM/rg35xxplus/paks/
+   - my282: squashfs tools -> build/SYSTEM/my282/paks/
+
+## Future Enhancements
 
 - [ ] **Third-party pak support** - Make it easy to integrate external paks
   - Document pak.json schema
@@ -97,13 +138,3 @@ None remaining!
   - Implement `dependencies` section in pak.json
   - Auto-fetch jq, syncthing, sftpgo, etc.
   - Reference: Jose's sftpgo pak Makefile
-
-## Next Recommended Action
-
-**All high and medium priority tool paks are now migrated, including WiFi!**
-
-Remaining paks are platform-specific (ADBD, SSH, Splore, etc.). These can be migrated as needed or left as platform-specific since they only apply to 1-2 platforms each.
-
-Consider:
-1. Third-party pak documentation - Make it easy for external developers to contribute paks
-2. Dependency management - Auto-download binaries like jq, syncthing, etc.

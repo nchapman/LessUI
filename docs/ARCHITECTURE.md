@@ -129,16 +129,19 @@ skeleton/
 │       ├── assets@2x.png # UI sprite sheet
 │       └── InterTight-Bold.ttf
 │
+├── BASE/                 # Base package content (Bios, Roms, Saves dirs)
 ├── BOOT/                 # Boot scripts
-└── EXTRAS/               # Optional paks
+└── TEMPLATES/            # Pak templates
 ```
 
 ### Output
 ```
 build/
 ├── SYSTEM/               # Core system files
-├── BOOT/                 # Bootloaders
-└── EXTRAS/               # Optional components
+│   └── <platform>/
+│       └── paks/         # Tool and emulator paks
+├── BASE/                 # Base package content
+└── BOOT/                 # Bootloaders
 ```
 
 ## The Pak System
