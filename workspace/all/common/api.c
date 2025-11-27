@@ -69,7 +69,7 @@ UI_Layout ui = {
     .pill_height = 30,
     .row_count = 6,
     .padding = 10,
-    .text_baseline = 4, // (30 * 2) / 15 = 4 for 30dp pill
+    .text_baseline = 6, // (30 * 2) / 10 = 6 for 30dp pill
     .button_size = 20,
     .button_margin = 5,
     .button_padding = 12,
@@ -201,8 +201,8 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 
 	// Text baseline offset - positions text slightly above center to account for
 	// visual weight of font glyphs (most text sits above baseline, descenders are rare)
-	// Gives ~4dp for 30dp pill, scales proportionally with pill height
-	ui.text_baseline = (ui.pill_height * 2) / 15;
+	// Gives ~6dp for 30dp pill, scales proportionally with pill height
+	ui.text_baseline = (ui.pill_height * 2) / 10;
 
 	// Settings indicators
 	ui.settings_size = ui.pill_height / 8; // ~4dp for 30dp pill
@@ -589,11 +589,6 @@ SDL_Surface* GFX_init(int mode) {
 	font.medium = TTF_OpenFont(FONT_PATH, DP(FONT_MEDIUM));
 	font.small = TTF_OpenFont(FONT_PATH, DP(FONT_SMALL));
 	font.tiny = TTF_OpenFont(FONT_PATH, DP(FONT_TINY));
-
-	TTF_SetFontStyle(font.large, TTF_STYLE_BOLD);
-	TTF_SetFontStyle(font.medium, TTF_STYLE_BOLD);
-	TTF_SetFontStyle(font.small, TTF_STYLE_BOLD);
-	TTF_SetFontStyle(font.tiny, TTF_STYLE_BOLD);
 
 	return gfx.screen;
 }
