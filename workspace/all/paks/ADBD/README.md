@@ -45,6 +45,6 @@ The pak performs the following steps:
 
 The pak uses a bind mount to replace `/etc/profile` with a minimal stub. This prevents the stock system from re-initializing all services when adbd sources the profile, which would interfere with the minimal environment.
 
-## Original Source
+## Architecture
 
-Migrated from `skeleton/EXTRAS/Tools/miyoomini/ADBD.pak/` to the cross-platform pak system.
+This pak follows the cross-platform pak architecture in `workspace/all/paks/`.

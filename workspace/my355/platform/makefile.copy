@@ -9,5 +9,3 @@ $(PLATFORM):
 	# boot assets
 	cp ./skeleton/SYSTEM/res/installing@2x.png ./build/BOOT/common/$@/installing.png
 	cp ./skeleton/SYSTEM/res/updating@2x.png ./build/BOOT/common/$@/updating.png
-	# extras
-	# Bootlogo.pak now constructed via workspace/all/paks/ (unified pak system)

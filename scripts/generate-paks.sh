@@ -66,31 +66,28 @@ get_platform_metadata() {
 
 # Function to get core metadata
 get_core_metadata() {
-    local core_type=$1  # "stock_cores" or "extra_cores"
-    local core=$2
-    local key=$3
-    jq -r ".${core_type}.\"$core\".\"$key\"" "$CORES_JSON"
+    local core=$1
+    local key=$2
+    jq -r ".stock_cores.\"$core\".\"$key\"" "$CORES_JSON"
 }
 
 # Function to check if core requires ARM64
 is_arm64_only() {
-    local core_type=$1
-    local core=$2
-    local arm64_only=$(jq -r ".${core_type}.\"$core\".arm64_only // false" "$CORES_JSON")
+    local core=$1
+    local arm64_only=$(jq -r ".stock_cores.\"$core\".arm64_only // false" "$CORES_JSON")
     [ "$arm64_only" = "true" ]
 }
 
 # Function to check if core is compatible with platform architecture
 is_core_compatible_with_platform() {
     local platform=$1
-    local core_type=$2
-    local core=$3
+    local core=$2
 
     # Get platform architecture
     local platform_arch=$(jq -r ".platforms.\"$platform\".arch" "$PLATFORMS_JSON")
 
     # If core is arm64_only and platform is arm32, skip
-    if [ "$platform_arch" = "arm32" ] && is_arm64_only "$core_type" "$core"; then
+    if [ "$platform_arch" = "arm32" ] && is_arm64_only "$core"; then
         return 1  # Not compatible
     fi
 
@@ -116,24 +113,15 @@ core_in_target_list() {
 generate_pak() {
     local platform=$1
     local core=$2
-    local core_type=$3  # "stock" or "extra"
-    local output_base=$4  # "SYSTEM" or "EXTRAS"
 
-    echo "  Generating ${core}.pak for $platform ($core_type)"
+    echo "  Generating ${core}.pak for $platform"
 
     # Get metadata
     local nice_prefix=$(get_platform_metadata "$platform" "nice_prefix")
-
-    local cores_json_type="${core_type}_cores"
-    local emu_exe=$(get_core_metadata "$cores_json_type" "$core" "emu_exe")
+    local emu_exe=$(get_core_metadata "$core" "emu_exe")
 
     # Create output directory
-    local output_dir="$BUILD_DIR/$output_base"
-    if [ "$output_base" = "SYSTEM" ]; then
-        output_dir="$output_dir/$platform/paks/Emus/${core}.pak"
-    else
-        output_dir="$output_dir/Emus/$platform/${core}.pak"
-    fi
+    local output_dir="$BUILD_DIR/SYSTEM/$platform/paks/Emus/${core}.pak"
 
     mkdir -p "$output_dir"
 
@@ -186,12 +174,12 @@ for platform in $PLATFORMS_TO_GENERATE; do
         fi
 
         # Check architecture compatibility
-        if ! is_core_compatible_with_platform "$platform" "stock_cores" "$core"; then
+        if ! is_core_compatible_with_platform "$platform" "$core"; then
             echo "  Skipping $core (requires ARM64)"
             continue
         fi
 
-        generate_pak "$platform" "$core" "stock" "SYSTEM"
+        generate_pak "$platform" "$core"
     done
 
     # Copy direct paks (non-template paks like PAK.pak)

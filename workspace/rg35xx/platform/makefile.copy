@@ -9,4 +9,3 @@ $(PLATFORM):
 	cp ./workspace/$@/install/install.sh ./build/SYSTEM/$@/bin/
 	cp ./workspace/$@/ramdisk/patched-ramdisk.img ./build/SYSTEM/$@/dat/ramdisk.img
 	cp ./skeleton/SYSTEM/res/charging@2x.png ./build/SYSTEM/$@/dat/charging.png
-	# extras

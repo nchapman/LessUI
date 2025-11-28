@@ -14,4 +14,3 @@ $(PLATFORM):
 	mkdir -p ./build/BOOT/common/$@/brick
 	cp ./skeleton/SYSTEM/res/installing@3x.png ./build/BOOT/common/$@/brick/installing.png
 	cp ./skeleton/SYSTEM/res/updating@3x.png ./build/BOOT/common/$@/brick/updating.png
-	# extras
