@@ -11,9 +11,9 @@ WIFI_NAME=""
 WIFI_PASS=""
 LINE_NUM=0
 while IFS= read -r line || [ -n "$line" ]; do
-	if [ $LINE_NUM -eq 0 ]; then
+	if [ "$LINE_NUM" -eq 0 ]; then
 		WIFI_NAME="$line"
-	elif [ $LINE_NUM -eq 1 ]; then
+	elif [ "$LINE_NUM" -eq 1 ]; then
 		WIFI_PASS="$line"
 		break
 	fi
@@ -54,7 +54,7 @@ connect()
 		sleep 1
 	done
 
-	kill $PRESENTER_PID 2>/dev/null
+	kill "$PRESENTER_PID" 2>/dev/null
 
 	if [ "$STATUS" = "up" ]; then
 		$PRESENTER "WiFi connected successfully!" 2
@@ -71,7 +71,6 @@ if [ "$WIFI_NAME" != "$CUR_NAME" ] || [ "$WIFI_PASS" != "$CUR_PASS" ]; then
 		disconnect
 	fi
 
-	echo "$WIFI_NAME:$WIFI_PASS"
 	$PRESENTER "Updating WiFi credentials..." 2
 	set_setting wifi.ssid "$WIFI_NAME"
 	set_setting wifi.key "$WIFI_PASS"

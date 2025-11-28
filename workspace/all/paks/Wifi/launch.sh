@@ -383,10 +383,7 @@ password_screen() {
 	fi
 
 	password="$(cat /tmp/minui-output)"
-	if [ -z "$password" ]; then
-		show_message "Password cannot be empty" 2
-		return 1
-	fi
+	# Allow empty passwords for open networks
 
 	touch "$SDCARD_PATH/wifi.txt"
 

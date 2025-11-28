@@ -14,7 +14,8 @@
     "zero28",
     "rgb30",
     "my282",
-    "magicmini"
+    "magicmini",
+    "m17"
   ],
 
   "launch": "launch.sh"

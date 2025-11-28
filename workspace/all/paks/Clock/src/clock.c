@@ -368,9 +368,13 @@ int main(int argc, char* argv[]) {
 	GFX_quit();
 
 	// Apply changes to system clock if user confirmed
-	if (save_changes)
+	if (save_changes) {
 		PLAT_setDateTime(year_selected, month_selected, day_selected, hour_selected,
 		                 minute_selected, seconds_selected);
+		system("minui-presenter 'Clock updated successfully!' 2");
+	} else {
+		system("minui-presenter 'Clock update cancelled' 2");
+	}
 
 	return EXIT_SUCCESS;
 }

@@ -25,16 +25,17 @@ fi
 
 	echo "Success"
 } > ./log.txt 2>&1 &
+INSTALL_PID=$!
 
 # Show installing message while it runs
 $PRESENTER "Installing SSH server...\n\nThis may take a few minutes.\nDevice will reboot when done." 200 &
 PRESENTER_PID=$!
 
 # Wait for installation to complete
-wait
+wait "$INSTALL_PID"
 
 # Kill the presenter
-kill $PRESENTER_PID 2>/dev/null
+kill "$PRESENTER_PID" 2>/dev/null
 
 if grep -q "Success" ./log.txt; then
 	$PRESENTER "SSH enabled successfully!\n\nLogin: root / root\nDevice will reboot now." 5 &

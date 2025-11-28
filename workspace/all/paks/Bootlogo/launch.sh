@@ -11,9 +11,12 @@ PRESENTER="$SYSTEM_PATH/bin/minui-presenter"
 # Platform-specific implementations
 case "$PLATFORM" in
 	miyoomini)
+		$PRESENTER "Flashing boot logo..." 30 &
+		PRESENTER_PID=$!
+
 		{
 			SUPPORTED_VERSION="202304280000"
-			if [ $MIYOO_VERSION -gt $SUPPORTED_VERSION ]; then
+			if [ "$MIYOO_VERSION" -gt "$SUPPORTED_VERSION" ]; then
 				echo "Unknown firmware version. Aborted."
 				exit 1
 			fi
@@ -42,6 +45,8 @@ case "$PLATFORM" in
 
 			echo "Done."
 		} > ./log.txt 2>&1
+
+		kill "$PRESENTER_PID" 2>/dev/null
 
 		if [ -f ./log.txt ] && grep -q "Done." ./log.txt; then
 			$PRESENTER "Boot logo flashed successfully!" 3
@@ -162,24 +167,35 @@ case "$PLATFORM" in
 
 	tg5040)
 		DIR=$(dirname "$0")
-		cd $DIR
+		cd "$DIR" || exit 1
+
+		# Detect device variant (brick uses different bootlogo path)
+		if [ "$DEVICE" = "brick" ]; then
+			LOGO_PATH="$DIR/brick/bootlogo.bmp"
+		else
+			LOGO_PATH="$DIR/tg5040/bootlogo.bmp"
+		fi
+
+		if [ ! -f "$LOGO_PATH" ]; then
+			$PRESENTER "No bootlogo.bmp file found!" 3
+			exit 1
+		fi
+
+		$PRESENTER "Flashing boot logo..." 10 &
+		PRESENTER_PID=$!
 
 		{
-			LOGO_PATH=$DIR/$DEVICE/bootlogo.bmp
-			if [ ! -f $LOGO_PATH ]; then
-				echo "No logo.bmp available. Aborted."
-				exit 1
-			fi
-
 			BOOT_PATH=/mnt/boot/
-			mkdir -p $BOOT_PATH
-			mount -t vfat /dev/mmcblk0p1 $BOOT_PATH
-			cp $LOGO_PATH $BOOT_PATH
+			mkdir -p "$BOOT_PATH"
+			mount -t vfat /dev/mmcblk0p1 "$BOOT_PATH"
+			cp "$LOGO_PATH" "$BOOT_PATH/bootlogo.bmp"
 			sync
-			umount $BOOT_PATH
+			umount "$BOOT_PATH"
 
 			echo "Done."
 		} > ./log.txt 2>&1
+
+		kill "$PRESENTER_PID" 2>/dev/null
 
 		if [ -f ./log.txt ] && grep -q "Done." ./log.txt; then
 			$PRESENTER "Boot logo flashed! Rebooting..." 3

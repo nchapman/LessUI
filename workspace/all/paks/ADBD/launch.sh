@@ -16,6 +16,10 @@ fi
 # Platform-specific implementation
 case "$PLATFORM" in
 	miyoomini)
+		# Show progress message
+		$PRESENTER "Enabling WiFi and ADB...\n\nPlease wait up to 20 seconds." 20 &
+		PRESENTER_PID=$!
+
 		{
 			# Load the WiFi driver from the SD card
 			if ! grep -q 8188fu /proc/modules 2>/dev/null; then
@@ -31,6 +35,9 @@ case "$PLATFORM" in
 			wpa_supplicant -B -D nl80211 -iwlan0 -c /appconfigs/wpa_supplicant.conf
 			udhcpc -i wlan0 -s /etc/init.d/udhcpc.script &
 
+			# Wait for WiFi connection
+			sleep 3
+
 			# Surgical strike to nop /etc/profile
 			# because it brings up the entire system again
 			mount -o bind "$PAK_DIR/miyoomini/profile" /etc/profile
@@ -39,13 +46,25 @@ case "$PLATFORM" in
 			export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$PAK_DIR/miyoomini"
 			"$PAK_DIR/miyoomini/adbd" &
 
+			# Give adbd time to start
+			sleep 1
+
 			echo "Success"
 		} > "$LOGS_PATH/$PAK_NAME.txt" 2>&1
 
-		if grep -q "Success" "$LOGS_PATH/$PAK_NAME.txt"; then
-			$PRESENTER "ADB enabled successfully!\n\nConnect via:\nadb connect <device-ip>" 4
+		# Kill progress indicator
+		kill "$PRESENTER_PID" 2>/dev/null
+
+		# Verify adbd started and get IP
+		if pidof adbd >/dev/null 2>&1; then
+			IP=$(ip -4 addr show dev wlan0 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1)
+			if [ -n "$IP" ]; then
+				$PRESENTER "ADB enabled!\n\nConnect via:\nadb connect $IP:5555" 5
+			else
+				$PRESENTER "ADB enabled!\n\nGet IP from WiFi menu,\nthen: adb connect <ip>:5555" 5
+			fi
 		else
-			$PRESENTER "Failed to enable ADB.\nCheck log for details." 4
+			$PRESENTER "Failed to start ADB.\n\nCheck $LOGS_PATH/$PAK_NAME.txt" 5
 		fi
 		;;
 	*)
