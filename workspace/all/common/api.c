@@ -71,8 +71,10 @@ UI_Layout ui = {
     .padding = 10,
     .edge_padding = 10,
     .text_baseline = 6, // (30 * 2) / 10 = 6 for 30dp pill
-    .button_size = 20,
+    .button_size = 20, // (30 * 2) / 3 = 20 for 30dp pill (button icons)
     .button_margin = 5,
+    .option_size = 22, // (30 * 3) / 4 = 22 for 30dp pill (submenu rows)
+    .option_baseline = 4, // (22 * 2) / 10 = 4 for 22dp option
     .button_padding = 12,
 };
 
@@ -203,7 +205,7 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 	         (used_dp * 100.0f) / available_dp);
 
 	// Derived proportional sizes (also ensure even pixels where needed)
-	ui.button_size = (ui.pill_height * 2) / 3; // ~20 for 30dp pill
+	ui.button_size = (ui.pill_height * 2) / 3; // ~20 for 30dp pill (button icons)
 	int button_px = DP(ui.button_size);
 	if (button_px % 2 != 0)
 		ui.button_size++; // Buttons look better even
@@ -211,10 +213,17 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 	ui.button_margin = (ui.pill_height - ui.button_size) / 2; // Center button in pill
 	ui.button_padding = (ui.pill_height * 2) / 5; // ~12 for 30dp pill
 
+	// Submenu option rows - larger than button icons
+	ui.option_size = (ui.pill_height * 3) / 4; // ~22 for 30dp pill
+	int option_px = DP(ui.option_size);
+	if (option_px % 2 != 0)
+		ui.option_size++; // Options look better even
+
 	// Text baseline offset - positions text slightly above center to account for
 	// visual weight of font glyphs (most text sits above baseline, descenders are rare)
 	// Gives ~6dp for 30dp pill, scales proportionally with pill height
 	ui.text_baseline = (ui.pill_height * 2) / 10;
+	ui.option_baseline = (ui.option_size * 2) / 10; // Same proportion for submenu rows
 
 	// Settings indicators
 	ui.settings_size = ui.pill_height / 8; // ~4dp for 30dp pill
@@ -443,6 +452,7 @@ SDL_Surface* GFX_init(int mode) {
 	asset_rgbs[ASSET_BLACK_PILL] = RGB_BLACK;
 	asset_rgbs[ASSET_DARK_GRAY_PILL] = RGB_DARK_GRAY;
 	asset_rgbs[ASSET_OPTION] = RGB_DARK_GRAY;
+	asset_rgbs[ASSET_OPTION_WHITE] = RGB_WHITE;
 	asset_rgbs[ASSET_BUTTON] = RGB_WHITE;
 	asset_rgbs[ASSET_PAGE_BG] = RGB_WHITE;
 	asset_rgbs[ASSET_STATE_BG] = RGB_WHITE;
@@ -479,6 +489,7 @@ SDL_Surface* GFX_init(int mode) {
 	asset_rects[ASSET_BLACK_PILL] = (SDL_Rect){ASSET_SCALE4(33, 1, 30, 30)};
 	asset_rects[ASSET_DARK_GRAY_PILL] = (SDL_Rect){ASSET_SCALE4(65, 1, 30, 30)};
 	asset_rects[ASSET_OPTION] = (SDL_Rect){ASSET_SCALE4(97, 1, 20, 20)};
+	asset_rects[ASSET_OPTION_WHITE] = (SDL_Rect){ASSET_SCALE4(1, 33, 20, 20)}; // Same as BUTTON src
 	asset_rects[ASSET_BUTTON] = (SDL_Rect){ASSET_SCALE4(1, 33, 20, 20)};
 	asset_rects[ASSET_PAGE_BG] = (SDL_Rect){ASSET_SCALE4(64, 33, 15, 15)};
 	asset_rects[ASSET_STATE_BG] = (SDL_Rect){ASSET_SCALE4(23, 54, 8, 8)};
@@ -501,60 +512,123 @@ SDL_Surface* GFX_init(int mode) {
 	asset_rects[ASSET_WIFI] = (SDL_Rect){ASSET_SCALE4(95, 39, 14, 10)};
 	asset_rects[ASSET_HOLE] = (SDL_Rect){ASSET_SCALE4(1, 63, 20, 20)};
 
-	// Scale assets if dp_scale doesn't exactly match the loaded asset tier
-	// Uses per-asset scaling to ensure pixel-perfect pill caps and buttons
-	if (fabsf(gfx_dp_scale - (float)asset_scale) > 0.01f) {
-		float scale_ratio = gfx_dp_scale / (float)asset_scale;
-		int pill_px = DP(ui.pill_height);
-		int button_px = DP(ui.button_size);
+	// Calculate target pixel sizes for UI elements
+	float scale_ratio = gfx_dp_scale / (float)asset_scale;
+	int pill_px = DP(ui.pill_height);
+	int button_px = DP(ui.button_size);
+	int option_px = DP(ui.option_size);
 
-		// Calculate destination sheet dimensions (proportionally scaled)
+	// Asset scaling categories:
+	// - SCALE_PILL: Scale to pill_px (main menu pills)
+	// - SCALE_BUTTON: Scale to button_px (button icons)
+	// - SCALE_OPTION: Scale to option_px, placed in virtual area (submenu option rows)
+	// - SCALE_PROPORTIONAL: Scale proportionally with dp_scale
+	// - SCALE_CENTERED: Scale proportionally, ensure even offset from pill_px for centering
+	enum {
+		SCALE_PROPORTIONAL,
+		SCALE_PILL,
+		SCALE_BUTTON,
+		SCALE_OPTION,
+		SCALE_CENTERED
+	};
+
+	// Define scaling behavior for each asset
+	// Assets with SCALE_OPTION need virtual area (they're scaled differently than source)
+	int asset_scale_type[ASSET_COUNT];
+	for (int i = 0; i < ASSET_COUNT; i++)
+		asset_scale_type[i] = SCALE_PROPORTIONAL; // Default
+
+	// Pills scale to pill_px
+	asset_scale_type[ASSET_WHITE_PILL] = SCALE_PILL;
+	asset_scale_type[ASSET_BLACK_PILL] = SCALE_PILL;
+	asset_scale_type[ASSET_DARK_GRAY_PILL] = SCALE_PILL;
+
+	// Button icons scale to button_px
+	asset_scale_type[ASSET_BUTTON] = SCALE_BUTTON;
+	asset_scale_type[ASSET_HOLE] = SCALE_BUTTON;
+
+	// Option pills scale to option_px (virtual assets - need their own space)
+	asset_scale_type[ASSET_OPTION] = SCALE_OPTION;
+	asset_scale_type[ASSET_OPTION_WHITE] = SCALE_OPTION;
+
+	// Icons that get centered in pills need even pixel difference
+	asset_scale_type[ASSET_BRIGHTNESS] = SCALE_CENTERED;
+	asset_scale_type[ASSET_VOLUME_MUTE] = SCALE_CENTERED;
+	asset_scale_type[ASSET_VOLUME] = SCALE_CENTERED;
+	asset_scale_type[ASSET_WIFI] = SCALE_CENTERED;
+
+	// Count virtual assets to calculate extra space needed
+	int virtual_asset_count = 0;
+	for (int i = 0; i < ASSET_COUNT; i++) {
+		if (asset_scale_type[i] == SCALE_OPTION)
+			virtual_asset_count++;
+	}
+
+	// Always scale if we have virtual assets or dp_scale doesn't match asset tier
+	int needs_scaling =
+	    (fabsf(gfx_dp_scale - (float)asset_scale) > 0.01f) || (virtual_asset_count > 0);
+
+	if (needs_scaling) {
+
+		// Calculate destination sheet dimensions
+		// Add extra row for virtual assets (those scaled to custom sizes)
 		int sheet_w = (int)(loaded_assets->w * scale_ratio + 0.5f);
-		int sheet_h = (int)(loaded_assets->h * scale_ratio + 0.5f);
+		int base_h = (int)(loaded_assets->h * scale_ratio + 0.5f);
+		int virtual_row_h = (virtual_asset_count > 0) ? option_px : 0;
+		int sheet_h = base_h + virtual_row_h;
 
 		// Create destination surface in RGBA8888 format
-		// Keep alpha channel throughout - SDL handles RGBA→RGB565 at final screen blit
 		gfx.assets = SDL_CreateRGBSurface(0, sheet_w, sheet_h, 32, RGBA_MASK_8888);
 
-		// Process each asset individually to ensure exact sizing
-		// Pills/buttons get exact dimensions, other assets scale proportionally
+		// Track position for virtual assets
+		int virtual_x = 0;
+		int virtual_y = base_h;
+
+		// Process each asset individually
 		for (int i = 0; i < ASSET_COUNT; i++) {
 			// Source rectangle in the @Nx sheet
 			SDL_Rect src_rect = {asset_rects[i].x, asset_rects[i].y, asset_rects[i].w,
 			                     asset_rects[i].h};
 
-			// Destination position (scaled proportionally)
+			// Destination position (scaled proportionally by default)
 			SDL_Rect dst_rect = {(int)(src_rect.x * scale_ratio + 0.5f),
 			                     (int)(src_rect.y * scale_ratio + 0.5f), 0, 0};
 
 			int target_w, target_h;
 
-			// Determine target dimensions based on asset type
-			// Strategy: Pills/buttons need exact sizes (GFX_blitPill relies on perfect dimensions)
-			// Other assets (icons, battery) use proportional scaling with bilinear smoothing
-			if (i == ASSET_WHITE_PILL || i == ASSET_BLACK_PILL || i == ASSET_DARK_GRAY_PILL) {
-				// Pill caps (30×30 @1x) → exactly pill_px
-				// GFX_blitPill splits these in half for left/right caps
+			// Determine target dimensions based on scale type
+			switch (asset_scale_type[i]) {
+			case SCALE_PILL:
 				target_w = target_h = pill_px;
-			} else if (i == ASSET_BUTTON || i == ASSET_HOLE || i == ASSET_OPTION) {
-				// Buttons/holes (20×20 @1x) → exactly button_px
+				break;
+
+			case SCALE_BUTTON:
 				target_w = target_h = button_px;
-			} else {
-				// All other assets: proportional scaling with rounding
+				break;
+
+			case SCALE_OPTION:
+				// Virtual asset - place in dedicated area at bottom of sheet
+				target_w = target_h = option_px;
+				dst_rect.x = virtual_x;
+				dst_rect.y = virtual_y;
+				virtual_x += option_px;
+				break;
+
+			case SCALE_CENTERED:
+				// Proportional but ensure even offset from pill for centering
 				target_w = (int)(src_rect.w * scale_ratio + 0.5f);
 				target_h = (int)(src_rect.h * scale_ratio + 0.5f);
+				if ((pill_px - target_w) % 2 != 0)
+					target_w++;
+				if ((pill_px - target_h) % 2 != 0)
+					target_h++;
+				break;
 
-				// Ensure even pixel difference from pill for perfect centering
-				// Only applies to standalone icons that get centered in pills
-				if (i == ASSET_BRIGHTNESS || i == ASSET_VOLUME_MUTE || i == ASSET_VOLUME ||
-				    i == ASSET_WIFI) {
-					if ((pill_px - target_w) % 2 != 0)
-						target_w++;
-					if ((pill_px - target_h) % 2 != 0)
-						target_h++;
-				}
-				// Battery assets (outline, fill, bolt) use proportional scaling only
-				// Their internal positioning is handled by proportional offsets in GFX_blitBattery
+			case SCALE_PROPORTIONAL:
+			default:
+				target_w = (int)(src_rect.w * scale_ratio + 0.5f);
+				target_h = (int)(src_rect.h * scale_ratio + 0.5f);
+				break;
 			}
 
 			// Extract this asset region from source sheet into RGBA8888 surface

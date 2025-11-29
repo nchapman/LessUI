@@ -152,8 +152,10 @@ typedef struct UI_Layout {
 	int padding; // Internal spacing between UI elements in dp
 	int edge_padding; // Distance from screen edges in dp (reduced on devices with bezels)
 	int text_baseline; // Vertical offset for text centering in pill
-	int button_size; // Size of button graphics in dp
+	int button_size; // Size of button icons in dp
 	int button_margin; // Margin around buttons in dp
+	int option_size; // Height of submenu option rows in dp
+	int option_baseline; // Vertical offset for text centering in option rows
 	int button_padding; // Padding inside buttons in dp
 	int settings_size; // Size of setting indicators in dp
 	int settings_width; // Width of setting indicators in dp
@@ -269,8 +271,9 @@ enum {
 	ASSET_WHITE_PILL, // Rounded rectangle (white)
 	ASSET_BLACK_PILL, // Rounded rectangle (black)
 	ASSET_DARK_GRAY_PILL, // Rounded rectangle (dark gray)
-	ASSET_OPTION, // Option indicator
-	ASSET_BUTTON, // Button background
+	ASSET_OPTION, // Option row background (gray, option_size)
+	ASSET_OPTION_WHITE, // Option row selected (white, option_size)
+	ASSET_BUTTON, // Button background (white, button_size)
 	ASSET_PAGE_BG, // Page background
 	ASSET_STATE_BG, // State indicator background
 	ASSET_PAGE, // Page indicator
