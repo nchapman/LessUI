@@ -149,7 +149,8 @@ typedef struct UI_Layout {
 	int screen_height_px; // Screen height in pixels (cached for convenience)
 	int pill_height; // Height of menu pills in dp (28-32 typical)
 	int row_count; // Number of visible menu rows (6-8)
-	int padding; // Screen edge padding in dp
+	int padding; // Internal spacing between UI elements in dp
+	int edge_padding; // Distance from screen edges in dp (reduced on devices with bezels)
 	int text_baseline; // Vertical offset for text centering in pill
 	int button_size; // Size of button graphics in dp
 	int button_margin; // Margin around buttons in dp

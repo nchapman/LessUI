@@ -69,6 +69,7 @@ UI_Layout ui = {
     .pill_height = 30,
     .row_count = 6,
     .padding = 10,
+    .edge_padding = 10,
     .text_baseline = 6, // (30 * 2) / 10 = 6 for 30dp pill
     .button_size = 20,
     .button_margin = 5,
@@ -119,10 +120,20 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 	// All rows (content + footer) use the same pill_height for visual consistency
 	const int MIN_PILL = 28;
 	const int MAX_PILL = 32;
-	const int DEFAULT_PADDING = 10;
+
+	// Internal padding between UI elements (always 10dp)
+	const int internal_padding = 10;
+
+	// Edge padding: distance from screen edges
+	// EDGE_PADDING allows smaller values on devices where bezel provides visual margin
+#ifdef EDGE_PADDING
+	const int edge_padding = EDGE_PADDING;
+#else
+	const int edge_padding = internal_padding;
+#endif
 
 	int screen_height_dp = (int)(screen_height / gfx_dp_scale + 0.5f);
-	int available_dp = screen_height_dp - (DEFAULT_PADDING * 2);
+	int available_dp = screen_height_dp - (edge_padding * 2);
 
 	// Calculate maximum possible rows (no arbitrary limit)
 	int max_possible_rows = (available_dp / MIN_PILL) - 1; // -1 for footer
@@ -182,7 +193,8 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 	ui.screen_height_px = screen_height;
 	ui.pill_height = best_pill;
 	ui.row_count = best_rows;
-	ui.padding = DEFAULT_PADDING;
+	ui.padding = internal_padding;
+	ui.edge_padding = edge_padding;
 
 	int used_dp = (ui.row_count + 1) * ui.pill_height;
 	(void)used_dp; // Used in LOG_info below
@@ -210,8 +222,8 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 
 	LOG_info("UI_initLayout: %dx%d @ %.2f\" → PPI=%.0f, dp_scale=%.2f\n", screen_width,
 	         screen_height, diagonal_inches, ppi, gfx_dp_scale);
-	LOG_info("UI_initLayout: pill=%ddp, rows=%d, padding=%ddp\n", ui.pill_height, ui.row_count,
-	         ui.padding);
+	LOG_info("UI_initLayout: pill=%ddp, rows=%d, padding=%ddp, edge_padding=%ddp\n", ui.pill_height,
+	         ui.row_count, ui.padding, ui.edge_padding);
 }
 
 static struct GFX_Context {
@@ -1036,8 +1048,8 @@ void GFX_blitPill(int asset, SDL_Surface* dst, const SDL_Rect* dst_rect) {
 	// Asset is a square (pill_px × pill_px), split into left and right halves
 	// For odd heights, left cap gets the extra pixel to avoid clipping
 	int asset_w = asset_rects[asset].w;
-	int left_cap = (asset_w + 1) / 2;  // rounds up for odd widths
-	int right_cap = asset_w / 2;       // rounds down for odd widths
+	int left_cap = (asset_w + 1) / 2; // rounds up for odd widths
+	int right_cap = asset_w / 2; // rounds down for odd widths
 
 	if (w < h)
 		w = h;
@@ -1329,8 +1341,8 @@ int GFX_blitHardwareGroup(SDL_Surface* dst, int show_setting) {
 
 	if (show_setting && !GetHDMI()) {
 		ow = DP(ui.pill_height + ui.settings_width + ui.padding + 4);
-		ox = ui.screen_width_px - DP(ui.padding) - ow;
-		oy = DP(ui.padding);
+		ox = ui.screen_width_px - DP(ui.edge_padding) - ow;
+		oy = DP(ui.edge_padding);
 		GFX_blitPill(gfx.mode == MODE_MAIN ? ASSET_DARK_GRAY_PILL : ASSET_BLACK_PILL, dst,
 		             &(SDL_Rect){ox, oy, ow, DP(ui.pill_height)});
 
@@ -1373,8 +1385,8 @@ int GFX_blitHardwareGroup(SDL_Surface* dst, int show_setting) {
 		if (show_wifi)
 			ow += ww;
 
-		ox = ui.screen_width_px - DP(ui.padding) - ow;
-		oy = DP(ui.padding);
+		ox = ui.screen_width_px - DP(ui.edge_padding) - ow;
+		oy = DP(ui.edge_padding);
 		GFX_blitPill(gfx.mode == MODE_MAIN ? ASSET_DARK_GRAY_PILL : ASSET_BLACK_PILL, dst,
 		             &(SDL_Rect){ox, oy, ow, DP(ui.pill_height)});
 		if (show_wifi) {
@@ -1443,8 +1455,8 @@ int GFX_blitButtonGroup(char** pairs, int primary, SDL_Surface* dst, int align_r
 	int w = 0; // individual button dimension
 	int h = 0; // hints index
 	ow = 0; // full pill width
-	ox = align_right ? dst->w - DP(ui.padding) : DP(ui.padding);
-	oy = dst->h - DP(ui.padding + ui.pill_height);
+	ox = align_right ? dst->w - DP(ui.edge_padding) : DP(ui.edge_padding);
+	oy = dst->h - DP(ui.edge_padding + ui.pill_height);
 
 	for (int i = 0; i < 2; i++) {
 		if (!pairs[i * 2])

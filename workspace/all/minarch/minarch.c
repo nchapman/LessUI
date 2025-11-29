@@ -4637,8 +4637,8 @@ static int Menu_message(char* message, char** pairs) {
 		if (dirty) {
 			GFX_clear(screen);
 			GFX_blitMessage(font.medium, message, screen,
-			                &(SDL_Rect){0, DP(ui.padding), DP(ui.screen_width),
-			                            DP(ui.screen_height - ui.pill_height - ui.padding)});
+			                &(SDL_Rect){0, DP(ui.edge_padding), DP(ui.screen_width),
+			                            DP(ui.screen_height - ui.pill_height - ui.edge_padding)});
 			GFX_blitButtonGroup(pairs, 0, screen, 1);
 			GFX_flip(screen);
 			dirty = 0;
@@ -5187,7 +5187,7 @@ static int Menu_options(MenuList* list) {
 	int await_input = 0;
 
 	// dependent on option list offset top and bottom, eg. the gray triangles
-	int max_visible_options = (ui.screen_height - (ui.padding + ui.pill_height) * 2) /
+	int max_visible_options = (ui.screen_height - (ui.edge_padding + ui.pill_height) * 2) /
 	                          ui.button_size; // 7 for 480, 10 for 720
 
 	int count;
@@ -5367,11 +5367,11 @@ static int Menu_options(MenuList* list) {
 							mw = w;
 					}
 					// cache the result
-					list->max_width = mw = MIN(mw, DP(ui.screen_width - ui.padding * 2));
+					list->max_width = mw = MIN(mw, DP(ui.screen_width - ui.edge_padding * 2));
 				}
 
 				int ox = DP_CENTER_PX(ui.screen_width, mw);
-				int oy = DP(ui.padding + ui.pill_height);
+				int oy = DP(ui.edge_padding + ui.pill_height);
 				int selected_row = selected - start;
 				for (int i = start, j = 0; i < end; i++, j++) {
 					MenuItem* item = &items[i];
@@ -5400,11 +5400,11 @@ static int Menu_options(MenuList* list) {
 				}
 			} else if (type == MENU_FIXED) {
 				// NOTE: no need to calculate max width
-				int mw = DP(ui.screen_width - ui.padding * 2);
+				int mw = DP(ui.screen_width - ui.edge_padding * 2);
 				// int lw,rw;
 				// lw = rw = mw / 2;
 				int ox, oy;
-				ox = oy = DP(ui.padding);
+				ox = oy = DP(ui.edge_padding);
 				oy += DP(ui.pill_height);
 
 				int selected_row = selected - start;
@@ -5478,11 +5478,11 @@ static int Menu_options(MenuList* list) {
 							mw = w;
 					}
 					// cache the result
-					list->max_width = mw = MIN(mw, DP(ui.screen_width - ui.padding * 2));
+					list->max_width = mw = MIN(mw, DP(ui.screen_width - ui.edge_padding * 2));
 				}
 
 				int ox = DP_CENTER_PX(ui.screen_width, mw);
-				int oy = DP(ui.padding + ui.pill_height);
+				int oy = DP(ui.edge_padding + ui.pill_height);
 				int selected_row = selected - start;
 				for (int i = start, j = 0; i < end; i++, j++) {
 					MenuItem* item = &items[i];
@@ -5532,10 +5532,10 @@ static int Menu_options(MenuList* list) {
 				int oy = (DP(ui.pill_height) - DP(SCROLL_HEIGHT)) / 2;
 				if (start > 0)
 					GFX_blitAsset(ASSET_SCROLL_UP, NULL, screen,
-					              &(SDL_Rect){ox, DP(ui.padding) + oy});
+					              &(SDL_Rect){ox, DP(ui.edge_padding) + oy});
 				if (end < count)
 					GFX_blitAsset(ASSET_SCROLL_DOWN, NULL, screen,
-					              &(SDL_Rect){ox, DP(ui.screen_height - ui.padding -
+					              &(SDL_Rect){ox, DP(ui.screen_height - ui.edge_padding -
 					                                 ui.pill_height - ui.button_size) +
 					                                  oy});
 			}
@@ -5548,7 +5548,7 @@ static int Menu_options(MenuList* list) {
 				GFX_sizeText(font.tiny, desc, DP(12), &w, &h);
 				GFX_blitText(font.tiny, desc, DP(12), COLOR_WHITE, screen,
 				             &(SDL_Rect){DP_CENTER_PX(ui.screen_width, w),
-				                         DP(ui.screen_height) - DP(ui.padding) - h, w, h});
+				                         DP(ui.screen_height) - DP(ui.edge_padding) - h, w, h});
 			}
 
 			GFX_flip(screen);
@@ -6018,7 +6018,7 @@ static void Menu_loop(void) {
 
 			int ox, oy;
 			int ow = GFX_blitHardwareGroup(screen, show_setting);
-			int max_width = DP(ui.screen_width) - DP(ui.padding * 2) - ow;
+			int max_width = DP(ui.screen_width) - DP(ui.edge_padding * 2) - ow;
 
 			char display_name[256];
 			int text_width = GFX_truncateText(font.large, rom_name, display_name, max_width,
@@ -6027,12 +6027,13 @@ static void Menu_loop(void) {
 
 			SDL_Surface* text;
 			text = TTF_RenderUTF8_Blended(font.large, display_name, COLOR_WHITE);
-			GFX_blitPill(
-			    ASSET_BLACK_PILL, screen,
-			    &(SDL_Rect){DP(ui.padding), DP(ui.padding), max_width, DP(ui.pill_height)});
-			SDL_BlitSurface(
-			    text, &(SDL_Rect){0, 0, max_width - DP(ui.button_padding * 2), text->h}, screen,
-			    &(SDL_Rect){DP(ui.padding + ui.button_padding), DP(ui.padding + ui.text_baseline)});
+			GFX_blitPill(ASSET_BLACK_PILL, screen,
+			             &(SDL_Rect){DP(ui.edge_padding), DP(ui.edge_padding), max_width,
+			                         DP(ui.pill_height)});
+			SDL_BlitSurface(text, &(SDL_Rect){0, 0, max_width - DP(ui.button_padding * 2), text->h},
+			                screen,
+			                &(SDL_Rect){DP(ui.edge_padding + ui.button_padding),
+			                            DP(ui.edge_padding + ui.text_baseline)});
 			SDL_FreeSurface(text);
 
 			if (show_setting && !GetHDMI())
@@ -6044,8 +6045,8 @@ static void Menu_loop(void) {
 			GFX_blitButtonGroup((char*[]){"B", "BACK", "A", "OKAY", NULL}, 1, screen, 1);
 
 			// Vertically center menu items between header and footer (all in DP)
-			int header_offset = ui.padding + ui.pill_height;
-			int footer_offset = ui.screen_height - ui.padding - ui.pill_height;
+			int header_offset = ui.edge_padding + ui.pill_height;
+			int footer_offset = ui.screen_height - ui.edge_padding - ui.pill_height;
 			int content_area_height = footer_offset - header_offset;
 			int menu_height_dp = MENU_ITEM_COUNT * ui.pill_height;
 			oy = header_offset + (content_area_height - menu_height_dp) / 2 - ui.padding;
@@ -6058,13 +6059,13 @@ static void Menu_loop(void) {
 					// disc change
 					if (menu.total_discs > 1 && i == ITEM_CONT) {
 						GFX_blitPill(ASSET_DARK_GRAY_PILL, screen,
-						             &(SDL_Rect){DP(ui.padding), DP(oy + ui.padding),
-						                         DP(ui.screen_width - ui.padding * 2),
+						             &(SDL_Rect){DP(ui.edge_padding), DP(oy + ui.padding),
+						                         DP(ui.screen_width - ui.edge_padding * 2),
 						                         DP(ui.pill_height)});
 						text = TTF_RenderUTF8_Blended(font.large, disc_name, COLOR_WHITE);
 						SDL_BlitSurface(
 						    text, NULL, screen,
-						    &(SDL_Rect){DP(ui.screen_width - ui.padding - ui.button_padding) -
+						    &(SDL_Rect){DP(ui.screen_width - ui.edge_padding - ui.button_padding) -
 						                    text->w,
 						                DP(oy + ui.padding + ui.text_baseline)});
 						SDL_FreeSurface(text);
@@ -6075,7 +6076,7 @@ static void Menu_loop(void) {
 
 					// pill
 					GFX_blitPill(ASSET_WHITE_PILL, screen,
-					             &(SDL_Rect){DP(ui.padding),
+					             &(SDL_Rect){DP(ui.edge_padding),
 					                         DP(oy + ui.padding + (i * ui.pill_height)), ow,
 					                         DP(ui.pill_height)});
 					text_color = COLOR_BLACK;
@@ -6083,7 +6084,7 @@ static void Menu_loop(void) {
 					// shadow
 					text = TTF_RenderUTF8_Blended(font.large, item, COLOR_BLACK);
 					SDL_BlitSurface(text, NULL, screen,
-					                &(SDL_Rect){DP(2 + ui.padding + ui.button_padding),
+					                &(SDL_Rect){DP(2 + ui.edge_padding + ui.button_padding),
 					                            DP(1 + ui.padding + oy + (i * ui.pill_height) +
 					                               ui.text_baseline)});
 					SDL_FreeSurface(text);
@@ -6093,7 +6094,7 @@ static void Menu_loop(void) {
 				text = TTF_RenderUTF8_Blended(font.large, item, text_color);
 				SDL_BlitSurface(
 				    text, NULL, screen,
-				    &(SDL_Rect){DP(ui.padding + ui.button_padding),
+				    &(SDL_Rect){DP(ui.edge_padding + ui.button_padding),
 				                DP(oy + ui.padding + (i * ui.pill_height) + ui.text_baseline)});
 				SDL_FreeSurface(text);
 			}
@@ -6107,7 +6108,7 @@ static void Menu_loop(void) {
 				int hh = DEVICE_HEIGHT / 2;
 				int pw = hw + DP(WINDOW_RADIUS * 2);
 				int ph = hh + DP(WINDOW_RADIUS * 2 + PAGINATION_HEIGHT + WINDOW_RADIUS);
-				ox = DEVICE_WIDTH - pw - DP(ui.padding);
+				ox = DEVICE_WIDTH - pw - DP(ui.edge_padding);
 				oy = (DEVICE_HEIGHT - ph) / 2;
 
 				// window
