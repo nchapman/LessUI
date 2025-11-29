@@ -104,14 +104,13 @@ static void* thumb_loader_thread(void* arg) {
 		pthread_mutex_unlock(&thumb_mutex);
 
 		// Load and scale (slow operations, done without lock)
+		// Note: caller already verified file exists before requesting
 		SDL_Surface* loaded = NULL;
-		if (exists(path)) {
-			SDL_Surface* orig = IMG_Load(path);
-			if (orig) {
-				loaded = GFX_scaleToFit(orig, max_w, max_h);
-				if (loaded != orig)
-					SDL_FreeSurface(orig);
-			}
+		SDL_Surface* orig = IMG_Load(path);
+		if (orig) {
+			loaded = GFX_scaleToFit(orig, max_w, max_h);
+			if (loaded != orig)
+				SDL_FreeSurface(orig);
 		}
 
 		// Post result
