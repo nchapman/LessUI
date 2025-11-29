@@ -1538,6 +1538,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
             title_x_pos = DP(ui.edge_padding + ui.button_padding);
         }
 
+        // Leave room for header (battery, wifi icons) even without title
         initial_list_y_padding = ui.pill_height;
         if (should_draw_background_image)
         {
@@ -1559,6 +1560,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
 
             GFX_blitPill(ASSET_BLACK_PILL, screen, &(SDL_Rect){pill_x_pos, DP(ui.edge_padding), pill_width, DP(ui.pill_height)});
 
+            // Add extra spacing below title
             initial_list_y_padding = ui.pill_height + (ui.pill_height / 2);
         }
 
@@ -1656,8 +1658,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
         }
 
         char truncated_display_text[256];
-        int text_width = GFX_truncateText(state->fonts.large, display_text, truncated_display_text, available_width, DP(ui.button_padding * 2));
-        int pill_width = MIN(available_width, text_width) + color_box_space;
+        int label_text_w = 0;
+        TTF_SizeUTF8(font.medium, display_text, &label_text_w, NULL);
+        GFX_truncateText(font.medium, display_text, truncated_display_text, available_width - DP(OPTION_PADDING * 2), 0);
+        TTF_SizeUTF8(font.medium, truncated_display_text, &label_text_w, NULL);
+        int pill_width = label_text_w + DP(OPTION_PADDING * 2) + color_box_space;
 
         if (j == selected_row)
         {
@@ -1711,14 +1716,15 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
 
             if (strcmp(display_selected_text, "") != 0)
             {
-                GFX_blitPill(ASSET_DARK_GRAY_PILL, screen, &(SDL_Rect){pill_x_pos, DP(ui.edge_padding + (j * ui.pill_height) + initial_list_y_padding), ui.screen_width_px - DP(ui.edge_padding + ui.button_margin), DP(ui.pill_height)});
+                int full_width = ui.screen_width_px - DP(ui.edge_padding * 2);
+                GFX_blitPill(ASSET_OPTION, screen, &(SDL_Rect){pill_x_pos, DP(ui.edge_padding + (j * ui.option_size) + initial_list_y_padding), full_width, DP(ui.option_size)});
             }
 
-            GFX_blitPill(ASSET_WHITE_PILL, screen, &(SDL_Rect){pill_x_pos, DP(ui.edge_padding + (j * ui.pill_height) + initial_list_y_padding), pill_width, DP(ui.pill_height)});
+            GFX_blitPill(ASSET_OPTION_WHITE, screen, &(SDL_Rect){pill_x_pos, DP(ui.edge_padding + (j * ui.option_size) + initial_list_y_padding), pill_width, DP(ui.option_size)});
         }
 
         SDL_Surface *text;
-        text = TTF_RenderUTF8_Blended(state->fonts.large, truncated_display_text, text_color);
+        text = TTF_RenderUTF8_Blended(font.medium, truncated_display_text, text_color);
 
         // Calculate text position based on alignment
         int text_x_pos;
@@ -1730,13 +1736,13 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
         }
         else if (strcmp(alignment, "right") == 0)
         {
-            text_x_pos = ui.screen_width_px - text->w - DP(ui.edge_padding + ui.button_padding) - color_box_space;
-            shadow_x_pos = ui.screen_width_px - text->w - DP(2 + ui.edge_padding + ui.button_padding) - color_box_space;
+            text_x_pos = ui.screen_width_px - text->w - DP(ui.edge_padding + OPTION_PADDING) - color_box_space;
+            shadow_x_pos = ui.screen_width_px - text->w - DP(2 + ui.edge_padding + OPTION_PADDING) - color_box_space;
         }
         else // left (default)
         {
-            text_x_pos = DP(ui.edge_padding + ui.button_padding);
-            shadow_x_pos = DP(2 + ui.edge_padding + ui.button_padding);
+            text_x_pos = DP(ui.edge_padding + OPTION_PADDING);
+            shadow_x_pos = DP(2 + ui.edge_padding + OPTION_PADDING);
         }
 
         // Adjust for the pill position in the top row without title
@@ -1758,7 +1764,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
 
         SDL_Rect pos = {
             text_x_pos,
-            DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.pill_height) + initial_list_y_padding + 4),
+            DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.option_size) + initial_list_y_padding + ui.option_baseline),
             text->w,
             text->h};
 
@@ -1767,10 +1773,10 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
         {
             // COLOR_BLACK
             SDL_Surface *accent_text;
-            accent_text = TTF_RenderUTF8_Blended(state->fonts.large, truncated_display_text, COLOR_BLACK);
+            accent_text = TTF_RenderUTF8_Blended(font.medium, truncated_display_text, COLOR_BLACK);
             SDL_Rect accent_pos = {
                 shadow_x_pos,
-                DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.pill_height) + initial_list_y_padding + 4 + 2),
+                DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.option_size) + initial_list_y_padding + ui.option_baseline + 1),
                 accent_text->w,
                 accent_text->h};
             SDL_BlitSurface(accent_text, NULL, screen, &accent_pos);
@@ -1785,7 +1791,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
         // draw the selected option text
         if (strcmp(display_selected_text, "") != 0)
         {
-            initial_cube_x_pos = ui.screen_width_px - DP(ui.edge_padding + ui.button_padding) - color_box_space;
+            initial_cube_x_pos = ui.screen_width_px - DP(ui.edge_padding + OPTION_PADDING) - color_box_space;
             if (j != 0 || strlen(state->title) > 0)
             {
                 SDL_Color selected_text_color = COLOR_WHITE;
@@ -1794,9 +1800,10 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
                     selected_text_color = COLOR_LIGHT_TEXT;
                 }
                 SDL_Surface *selected_text;
-                selected_text = TTF_RenderUTF8_Blended(state->fonts.large, display_selected_text, selected_text_color);
-                pos = (SDL_Rect){ui.screen_width_px - selected_text->w - DP(ui.edge_padding + ui.button_padding) - color_box_space, pos.y, selected_text->w, selected_text->h};
-                SDL_BlitSurface(selected_text, NULL, screen, &pos);
+                selected_text = TTF_RenderUTF8_Blended(font.small, display_selected_text, selected_text_color);
+                int value_y = DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.option_size) + initial_list_y_padding + ui.option_value_baseline);
+                SDL_Rect value_pos = (SDL_Rect){ui.screen_width_px - selected_text->w - DP(ui.edge_padding + OPTION_PADDING) - color_box_space, value_y, selected_text->w, selected_text->h};
+                SDL_BlitSurface(selected_text, NULL, screen, &value_pos);
                 SDL_FreeSurface(selected_text);
             }
         }
@@ -1812,14 +1819,14 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
             uint32_t outline_color = sdl_color_to_uint32(text_color);
             SDL_Rect outline_rect = {
                 initial_cube_x_pos + DP(ui.padding),
-                DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.pill_height) + initial_list_y_padding + 5), color_placeholder_height,
+                DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.option_size) + initial_list_y_padding + 5), color_placeholder_height,
                 color_placeholder_height};
             SDL_FillRect(screen, &(SDL_Rect){outline_rect.x, outline_rect.y, outline_rect.w, outline_rect.h}, outline_color);
 
             // Draw color cube
             SDL_Rect color_rect = {
                 initial_cube_x_pos + DP(ui.padding) + 2,
-                DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.pill_height) + initial_list_y_padding + 5) + 2, color_placeholder_height - 4,
+                DP(ui.edge_padding + ((i - state->list_state->first_visible) * ui.option_size) + initial_list_y_padding + 5) + 2, color_placeholder_height - 4,
                 color_placeholder_height - 4};
             SDL_FillRect(screen, &(SDL_Rect){color_rect.x, color_rect.y, color_rect.w, color_rect.h}, color);
         }
