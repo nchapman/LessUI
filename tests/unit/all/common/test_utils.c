@@ -439,6 +439,106 @@ void test_getDisplayName_nointro_article(void) {
 	TEST_ASSERT_EQUAL_STRING("The Legend of Zelda", out);
 }
 
+// No-Intro: Region tags
+void test_getDisplayName_nointro_single_region(void) {
+	char out[256];
+	getDisplayName("Super Metroid (USA).sfc", out);
+	TEST_ASSERT_EQUAL_STRING("Super Metroid", out);
+}
+
+void test_getDisplayName_nointro_multi_region(void) {
+	char out[256];
+	getDisplayName("Test Rom Name, The (Japan, USA).gb", out);
+	TEST_ASSERT_EQUAL_STRING("The Test Rom Name", out);
+}
+
+void test_getDisplayName_nointro_world_region(void) {
+	char out[256];
+	getDisplayName("Tetris (World).gb", out);
+	TEST_ASSERT_EQUAL_STRING("Tetris", out);
+}
+
+// No-Intro: Language tags
+void test_getDisplayName_nointro_languages(void) {
+	char out[256];
+	getDisplayName("Super Metroid (Japan, USA) (En,Ja).sfc", out);
+	TEST_ASSERT_EQUAL_STRING("Super Metroid", out);
+}
+
+void test_getDisplayName_nointro_single_language(void) {
+	char out[256];
+	getDisplayName("Game (Europe) (En).nes", out);
+	TEST_ASSERT_EQUAL_STRING("Game", out);
+}
+
+// No-Intro: Version tags
+void test_getDisplayName_nointro_version(void) {
+	char out[256];
+	getDisplayName("Mario Kart (USA) (v1.2).sfc", out);
+	TEST_ASSERT_EQUAL_STRING("Mario Kart", out);
+}
+
+void test_getDisplayName_nointro_revision(void) {
+	char out[256];
+	getDisplayName("Pokemon Red (USA) (Rev A).gb", out);
+	TEST_ASSERT_EQUAL_STRING("Pokemon Red", out);
+}
+
+// No-Intro: Development status tags
+void test_getDisplayName_nointro_beta(void) {
+	char out[256];
+	getDisplayName("StarFox (USA) (Beta).sfc", out);
+	TEST_ASSERT_EQUAL_STRING("StarFox", out);
+}
+
+void test_getDisplayName_nointro_proto(void) {
+	char out[256];
+	getDisplayName("Resident Evil (USA) (Proto).psx", out);
+	TEST_ASSERT_EQUAL_STRING("Resident Evil", out);
+}
+
+// No-Intro: Multiple tags combined
+void test_getDisplayName_nointro_all_tags(void) {
+	char out[256];
+	getDisplayName("Final Fantasy, The (Japan, USA) (En,Ja) (v1.1) (Proto).sfc", out);
+	TEST_ASSERT_EQUAL_STRING("The Final Fantasy", out);
+}
+
+void test_getDisplayName_nointro_complex_article(void) {
+	char out[256];
+	getDisplayName("Legend of Dragoon, The (USA) (Disc 1).bin", out);
+	TEST_ASSERT_EQUAL_STRING("The Legend of Dragoon", out);
+}
+
+// No-Intro: Square brackets (status flags)
+void test_getDisplayName_nointro_bad_dump(void) {
+	char out[256];
+	getDisplayName("Rare Game (USA) [b].nes", out);
+	TEST_ASSERT_EQUAL_STRING("Rare Game", out);
+}
+
+void test_getDisplayName_nointro_square_and_round(void) {
+	char out[256];
+	getDisplayName("Adventure (USA) (v1.0) [!].nes", out);
+	TEST_ASSERT_EQUAL_STRING("Adventure", out);
+}
+
+// No-Intro: Edge cases
+void test_getDisplayName_nointro_title_with_parens(void) {
+	char out[256];
+	// Game title itself contains parentheses - should preserve them
+	// This is a known limitation - we'll strip all tags for now
+	getDisplayName("Kirby's Fun Pak (Kirby Super Star) (USA).sfc", out);
+	TEST_ASSERT_EQUAL_STRING("Kirby's Fun Pak", out);
+}
+
+void test_getDisplayName_nointro_article_no_comma(void) {
+	char out[256];
+	// Article is already at the beginning
+	getDisplayName("The Legend of Zelda (USA).nes", out);
+	TEST_ASSERT_EQUAL_STRING("The Legend of Zelda", out);
+}
+
 ///////////////////////////////
 // Date/Time Tests
 ///////////////////////////////
@@ -793,6 +893,23 @@ int main(void) {
 	RUN_TEST(test_fixArticle_an);
 	RUN_TEST(test_fixArticle_no_article);
 	RUN_TEST(test_getDisplayName_nointro_article);
+
+	// No-Intro naming convention tests
+	RUN_TEST(test_getDisplayName_nointro_single_region);
+	RUN_TEST(test_getDisplayName_nointro_multi_region);
+	RUN_TEST(test_getDisplayName_nointro_world_region);
+	RUN_TEST(test_getDisplayName_nointro_languages);
+	RUN_TEST(test_getDisplayName_nointro_single_language);
+	RUN_TEST(test_getDisplayName_nointro_version);
+	RUN_TEST(test_getDisplayName_nointro_revision);
+	RUN_TEST(test_getDisplayName_nointro_beta);
+	RUN_TEST(test_getDisplayName_nointro_proto);
+	RUN_TEST(test_getDisplayName_nointro_all_tags);
+	RUN_TEST(test_getDisplayName_nointro_complex_article);
+	RUN_TEST(test_getDisplayName_nointro_bad_dump);
+	RUN_TEST(test_getDisplayName_nointro_square_and_round);
+	RUN_TEST(test_getDisplayName_nointro_title_with_parens);
+	RUN_TEST(test_getDisplayName_nointro_article_no_comma);
 
 	// Leap year
 	RUN_TEST(test_isLeapYear_divisible_by_4);

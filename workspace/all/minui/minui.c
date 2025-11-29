@@ -2394,7 +2394,7 @@ int main(int argc, char* argv[]) {
 
 		// Animate thumbnail fade-in
 		if (cached_thumb && thumb_alpha < 255) {
-			#define THUMB_FADE_MS 100 // Duration of fade-in animation
+#define THUMB_FADE_MS 100 // Duration of fade-in animation
 			int fade_step = 255 * 16 / THUMB_FADE_MS; // 16ms per frame at 60fps
 			thumb_alpha += fade_step;
 			if (thumb_alpha > 255)
@@ -2524,12 +2524,13 @@ int main(int argc, char* argv[]) {
 						int available_width;
 						if (thumb_exists) {
 							if (j == selected_row) {
-							// Selected item: 70% of screen width
-							available_width = ((ui.screen_width_px * 70) / 100) - DP(ui.edge_padding * 2);
-						} else {
-							// Unselected items: 60% of screen width
-							available_width = thumb_area_x - DP(ui.edge_padding * 2);
-						}
+								// Selected item: 70% of screen width
+								available_width =
+								    ((ui.screen_width_px * 70) / 100) - DP(ui.edge_padding * 2);
+							} else {
+								// Unselected items: 60% of screen width
+								available_width = thumb_area_x - DP(ui.edge_padding * 2);
+							}
 						} else {
 							available_width = DP(ui.screen_width) - DP(ui.edge_padding * 2);
 							if (i == top->start)

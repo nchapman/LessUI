@@ -62,6 +62,7 @@ LDFLAGS = -ldl -flto $(SDL_LIBS) -lSDL2 -lSDL2_image -lSDL2_ttf -lpthread -lm -l
 MINUI_SOURCE = workspace/all/minui/minui.c \
                workspace/all/common/scaler.c \
                workspace/all/common/utils.c \
+               workspace/all/common/nointro_parser.c \
                workspace/all/common/api.c \
                workspace/all/common/log.c \
                workspace/all/common/collections.c \

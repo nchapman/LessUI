@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "defines.h"
 #include "log.h"
+#include "nointro_parser.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -435,24 +436,22 @@ void fixArticle(char* name) {
 /**
  * Cleans a ROM or app path for display in the UI.
  *
- * Performs multiple transformations:
+ * Uses the No-Intro parser for ROM names, which handles:
  * 1. Extracts filename from full path
  * 2. Removes file extensions (including multi-part like .p8.png)
- * 3. Strips region codes and metadata in parentheses/brackets
- *    Example: "Super Mario (USA) (v1.2).nes" -> "Super Mario"
- * 4. Removes trailing whitespace
+ * 3. Strips No-Intro tags: region (USA), language (En,Ja), version (v1.2), etc.
+ * 4. Moves articles to front: "Name, The" -> "The Name"
  * 5. Special handling: strips platform suffix from Tools paths
  *
  * @param in_name Input path (may be full path or just filename)
  * @param out_name Output buffer for cleaned name (min 256 bytes)
  *
- * @note If all content is removed, the previous valid name is restored
+ * @note Uses nointro_parser for comprehensive ROM name handling
  */
 void getDisplayName(const char* in_name, char* out_name) {
-	char* tmp;
 	char work_name[256];
+	char* tmp;
 	strcpy(work_name, in_name);
-	strcpy(out_name, in_name);
 
 	// Special case: hide platform suffix from Tools paths
 	if (suffixMatch("/" PLATFORM, work_name)) {
@@ -461,43 +460,10 @@ void getDisplayName(const char* in_name, char* out_name) {
 			tmp[0] = '\0';
 	}
 
-	// Extract just the filename if we have a full path
-	tmp = strrchr(work_name, '/');
-	if (tmp)
-		strcpy(out_name, tmp + 1);
-
-	// Remove all file extensions (handles multi-part like .p8.png)
-	// Only removes extensions between 1-4 characters (plus dot)
-	while ((tmp = strrchr(out_name, '.')) != NULL) {
-		int len = strlen(tmp);
-		if (len > 2 && len <= 5) {
-			tmp[0] = '\0'; // Extended to 5 for .doom files
-		} else {
-			break;
-		}
-	}
-
-	// Remove trailing metadata in parentheses or brackets
-	// Example: "Game (USA) [!]" -> "Game"
-	strcpy(work_name, out_name);
-	while ((tmp = strrchr(out_name, '(')) != NULL || (tmp = strrchr(out_name, '[')) != NULL) {
-		if (tmp == out_name)
-			break; // Don't remove if name would be empty
-		tmp[0] = '\0';
-	}
-
-	// Safety check: restore previous name if we removed everything
-	if (out_name[0] == '\0')
-		strcpy(out_name, work_name);
-
-	// Remove trailing whitespace
-	int len = strlen(out_name);
-	while (len > 0 && isspace((unsigned char)out_name[len - 1]))
-		len--;
-	out_name[len] = '\0';
-
-	// Fix No-Intro article convention: "Name, The" -> "The Name"
-	fixArticle(out_name);
+	// Use No-Intro parser to get clean display name
+	NoIntroName parsed;
+	parseNoIntroName(work_name, &parsed);
+	strcpy(out_name, parsed.display_name);
 }
 
 /**
