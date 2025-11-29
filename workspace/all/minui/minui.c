@@ -2409,7 +2409,7 @@ int main(int argc, char* argv[]) {
 			int oy;
 
 			// Fixed thumbnail area width (40% of screen) when thumbnail exists
-			// Text gets 60%, thumbnail gets 40% - prevents text reflowing when thumbnail loads
+			// Unselected text gets 60%, selected text gets 70%
 			int thumb_area_x = (ui.screen_width_px * 60) / 100;
 
 			// Display cached thumbnail if available (centered in thumbnail area)
@@ -2523,7 +2523,13 @@ int main(int argc, char* argv[]) {
 						// Use fixed 60% width when thumbnail exists (prevents text reflow)
 						int available_width;
 						if (thumb_exists) {
+							if (j == selected_row) {
+							// Selected item: 70% of screen width
+							available_width = ((ui.screen_width_px * 70) / 100) - DP(ui.edge_padding * 2);
+						} else {
+							// Unselected items: 60% of screen width
 							available_width = thumb_area_x - DP(ui.edge_padding * 2);
+						}
 						} else {
 							available_width = DP(ui.screen_width) - DP(ui.edge_padding * 2);
 							if (i == top->start)
