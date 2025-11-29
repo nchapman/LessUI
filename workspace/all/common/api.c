@@ -74,7 +74,8 @@ UI_Layout ui = {
     .button_size = 20, // (30 * 2) / 3 = 20 for 30dp pill (button icons)
     .button_margin = 5,
     .option_size = 22, // (30 * 3) / 4 = 22 for 30dp pill (submenu rows)
-    .option_baseline = 4, // (22 * 2) / 10 = 4 for 22dp option
+    .option_baseline = 2, // (22 * 1) / 10 = 2 for 22dp option (font.medium)
+    .option_value_baseline = 4, // ~18% - slightly lower for smaller font.small
     .button_padding = 12,
 };
 
@@ -223,7 +224,9 @@ void UI_initLayout(int screen_width, int screen_height, float diagonal_inches) {
 	// visual weight of font glyphs (most text sits above baseline, descenders are rare)
 	// Gives ~6dp for 30dp pill, scales proportionally with pill height
 	ui.text_baseline = (ui.pill_height * 2) / 10;
-	ui.option_baseline = (ui.option_size * 2) / 10; // Same proportion for submenu rows
+	// Option baselines for submenu rows (smaller fonts need different positioning)
+	ui.option_baseline = (ui.option_size * 10 + 5) / 100; // ~10% with rounding (2dp for 22dp)
+	ui.option_value_baseline = (ui.option_size * 18 + 5) / 100; // ~18% with rounding (4dp for 22dp)
 
 	// Settings indicators
 	ui.settings_size = ui.pill_height / 8; // ~4dp for 30dp pill
@@ -524,13 +527,7 @@ SDL_Surface* GFX_init(int mode) {
 	// - SCALE_OPTION: Scale to option_px, placed in virtual area (submenu option rows)
 	// - SCALE_PROPORTIONAL: Scale proportionally with dp_scale
 	// - SCALE_CENTERED: Scale proportionally, ensure even offset from pill_px for centering
-	enum {
-		SCALE_PROPORTIONAL,
-		SCALE_PILL,
-		SCALE_BUTTON,
-		SCALE_OPTION,
-		SCALE_CENTERED
-	};
+	enum { SCALE_PROPORTIONAL, SCALE_PILL, SCALE_BUTTON, SCALE_OPTION, SCALE_CENTERED };
 
 	// Define scaling behavior for each asset
 	// Assets with SCALE_OPTION need virtual area (they're scaled differently than source)
@@ -569,7 +566,6 @@ SDL_Surface* GFX_init(int mode) {
 	    (fabsf(gfx_dp_scale - (float)asset_scale) > 0.01f) || (virtual_asset_count > 0);
 
 	if (needs_scaling) {
-
 		// Calculate destination sheet dimensions
 		// Add extra row for virtual assets (those scaled to custom sizes)
 		int sheet_w = (int)(loaded_assets->w * scale_ratio + 0.5f);

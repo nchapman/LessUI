@@ -5445,10 +5445,9 @@ static int Menu_options(MenuList* list) {
 							desc = item->desc;
 					}
 					text = TTF_RenderUTF8_Blended(font.medium, item->name, text_color);
-					SDL_BlitSurface(
-					    text, NULL, screen,
-					    &(SDL_Rect){ox + DP(OPTION_PADDING),
-					                oy + DP(j * ui.option_size + ui.option_baseline)});
+					SDL_BlitSurface(text, NULL, screen,
+					                &(SDL_Rect){ox + DP(OPTION_PADDING),
+					                            oy + DP(j * ui.option_size + ui.option_baseline)});
 					SDL_FreeSurface(text);
 				}
 			} else if (type == MENU_FIXED) {
@@ -5475,7 +5474,7 @@ static int Menu_options(MenuList* list) {
 					int total_available = mw - DP(OPTION_PADDING * 3);
 					const char* value_str = (item->value >= 0) ? item->values[item->value] : NULL;
 					calculateProportionalWidths(item->name, value_str, total_available,
-					                           &label_text_w, &value_text_w);
+					                            &label_text_w, &value_text_w);
 
 					int label_w = label_text_w + DP(OPTION_PADDING * 2);
 
@@ -5485,17 +5484,18 @@ static int Menu_options(MenuList* list) {
 						GFX_truncateText(font.small, item->values[item->value], truncated,
 						                 value_text_w, 0);
 						text = TTF_RenderUTF8_Blended(font.small, truncated, COLOR_WHITE);
-						SDL_BlitSurface(text, NULL, screen,
-						                &(SDL_Rect){ox + mw - text->w - DP(OPTION_PADDING),
-						                            oy + DP(j * ui.option_size + ui.option_baseline)});
+						SDL_BlitSurface(
+						    text, NULL, screen,
+						    &(SDL_Rect){ox + mw - text->w - DP(OPTION_PADDING),
+						                oy + DP(j * ui.option_size + ui.option_value_baseline)});
 						SDL_FreeSurface(text);
 					}
 
 					if (j == selected_row) {
 						// white pill
-						GFX_blitPill(
-						    ASSET_OPTION_WHITE, screen,
-						    &(SDL_Rect){ox, oy + DP(j * ui.option_size), label_w, DP(ui.option_size)});
+						GFX_blitPill(ASSET_OPTION_WHITE, screen,
+						             &(SDL_Rect){ox, oy + DP(j * ui.option_size), label_w,
+						                         DP(ui.option_size)});
 						text_color = COLOR_BLACK;
 
 						if (item->desc)
@@ -5505,10 +5505,9 @@ static int Menu_options(MenuList* list) {
 					char label_truncated[256];
 					GFX_truncateText(font.medium, item->name, label_truncated, label_text_w, 0);
 					text = TTF_RenderUTF8_Blended(font.medium, label_truncated, text_color);
-					SDL_BlitSurface(
-					    text, NULL, screen,
-					    &(SDL_Rect){ox + DP(OPTION_PADDING),
-					                oy + DP(j * ui.option_size + ui.option_baseline)});
+					SDL_BlitSurface(text, NULL, screen,
+					                &(SDL_Rect){ox + DP(OPTION_PADDING),
+					                            oy + DP(j * ui.option_size + ui.option_baseline)});
 					SDL_FreeSurface(text);
 				}
 			} else if (type == MENU_VAR || type == MENU_INPUT) {
@@ -5556,7 +5555,7 @@ static int Menu_options(MenuList* list) {
 					int total_available = mw - DP(OPTION_PADDING * 3);
 					const char* value_str = (item->value >= 0) ? item->values[item->value] : NULL;
 					calculateProportionalWidths(item->name, value_str, total_available,
-					                           &label_text_w, &value_text_w);
+					                            &label_text_w, &value_text_w);
 
 					int label_w = label_text_w + DP(OPTION_PADDING * 2);
 
@@ -5567,9 +5566,9 @@ static int Menu_options(MenuList* list) {
 						    &(SDL_Rect){ox, oy + DP(j * ui.option_size), mw, DP(ui.option_size)});
 
 						// white pill
-						GFX_blitPill(
-						    ASSET_OPTION_WHITE, screen,
-						    &(SDL_Rect){ox, oy + DP(j * ui.option_size), label_w, DP(ui.option_size)});
+						GFX_blitPill(ASSET_OPTION_WHITE, screen,
+						             &(SDL_Rect){ox, oy + DP(j * ui.option_size), label_w,
+						                         DP(ui.option_size)});
 						text_color = COLOR_BLACK;
 
 						if (item->desc)
@@ -5579,10 +5578,9 @@ static int Menu_options(MenuList* list) {
 					char label_truncated[256];
 					GFX_truncateText(font.medium, item->name, label_truncated, label_text_w, 0);
 					text = TTF_RenderUTF8_Blended(font.medium, label_truncated, text_color);
-					SDL_BlitSurface(
-					    text, NULL, screen,
-					    &(SDL_Rect){ox + DP(OPTION_PADDING),
-					                oy + DP(j * ui.option_size + ui.option_baseline)});
+					SDL_BlitSurface(text, NULL, screen,
+					                &(SDL_Rect){ox + DP(OPTION_PADDING),
+					                            oy + DP(j * ui.option_size + ui.option_baseline)});
 					SDL_FreeSurface(text);
 
 					if (await_input && j == selected_row) {
@@ -5593,9 +5591,10 @@ static int Menu_options(MenuList* list) {
 						GFX_truncateText(font.small, item->values[item->value], truncated,
 						                 value_text_w, 0);
 						text = TTF_RenderUTF8_Blended(font.small, truncated, COLOR_WHITE);
-						SDL_BlitSurface(text, NULL, screen,
-						                &(SDL_Rect){ox + mw - text->w - DP(OPTION_PADDING),
-						                            oy + DP(j * ui.option_size + ui.option_baseline)});
+						SDL_BlitSurface(
+						    text, NULL, screen,
+						    &(SDL_Rect){ox + mw - text->w - DP(OPTION_PADDING),
+						                oy + DP(j * ui.option_size + ui.option_value_baseline)});
 						SDL_FreeSurface(text);
 					}
 				}

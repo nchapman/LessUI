@@ -155,7 +155,8 @@ typedef struct UI_Layout {
 	int button_size; // Size of button icons in dp
 	int button_margin; // Margin around buttons in dp
 	int option_size; // Height of submenu option rows in dp
-	int option_baseline; // Vertical offset for text centering in option rows
+	int option_baseline; // Vertical offset for label text (font.medium) in option rows
+	int option_value_baseline; // Vertical offset for value text (font.small) in option rows
 	int button_padding; // Padding inside buttons in dp
 	int settings_size; // Size of setting indicators in dp
 	int settings_width; // Width of setting indicators in dp
