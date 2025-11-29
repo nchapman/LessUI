@@ -2524,9 +2524,9 @@ int main(int argc, char* argv[]) {
 						int available_width;
 						if (thumb_exists) {
 							if (j == selected_row) {
-								// Selected item: 70% of screen width
+								// Selected item: 100% of screen width (for now)
 								available_width =
-								    ((ui.screen_width_px * 70) / 100) - DP(ui.edge_padding * 2);
+								    ((ui.screen_width_px * 100) / 100) - DP(ui.edge_padding * 2);
 							} else {
 								// Unselected items: 60% of screen width
 								available_width = thumb_area_x - DP(ui.edge_padding * 2);
