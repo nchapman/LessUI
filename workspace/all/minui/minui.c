@@ -2193,6 +2193,7 @@ int main(int argc, char* argv[]) {
 	char cached_thumb_path[MAX_PATH] = {0}; // Path of cached thumbnail
 	Entry* last_rendered_entry = NULL; // Last entry we rendered (for change detection)
 	int thumb_exists = 0; // Whether thumbnail exists for current entry
+	int thumb_alpha = 255; // Current fade alpha (0-255), starts full for instant display
 
 	// LOG_info("- loop start: %lu", SDL_GetTicks() - main_begin);
 	while (!quit) {
@@ -2386,8 +2387,19 @@ int main(int argc, char* argv[]) {
 			SDL_Surface* loaded = ThumbLoader_get(cached_thumb_path);
 			if (loaded) {
 				cached_thumb = loaded;
+				thumb_alpha = 0; // Start fade from transparent
 				dirty = 1;
 			}
+		}
+
+		// Animate thumbnail fade-in
+		if (cached_thumb && thumb_alpha < 255) {
+			#define THUMB_FADE_MS 100 // Duration of fade-in animation
+			int fade_step = 255 * 16 / THUMB_FADE_MS; // 16ms per frame at 60fps
+			thumb_alpha += fade_step;
+			if (thumb_alpha > 255)
+				thumb_alpha = 255;
+			dirty = 1;
 		}
 
 		// Rendering
@@ -2405,6 +2417,7 @@ int main(int argc, char* argv[]) {
 				int padding = DP(ui.edge_padding);
 				int ox = ui.screen_width_px - cached_thumb->w - padding;
 				oy = (ui.screen_height_px - cached_thumb->h) / 2;
+				SDLX_SetAlpha(cached_thumb, SDL_SRCALPHA, thumb_alpha);
 				SDL_BlitSurface(cached_thumb, NULL, screen, &(SDL_Rect){ox, oy, 0, 0});
 			}
 
