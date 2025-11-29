@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <msettings.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,6 +50,157 @@
 // Note: Array and Hash data structures moved to workspace/all/common/collections.c
 // This makes them reusable across all components and easier to test.
 ///////////////////////////////
+
+///////////////////////////////
+// Async thumbnail loader
+//
+// Loads thumbnails in a background thread to prevent UI stutter during scrolling.
+// Design: Single worker thread with request superseding (new requests cancel pending).
+// Thread-safe handoff via mutex-protected result surface.
+///////////////////////////////
+
+// Thumbnail loader state
+static pthread_t thumb_thread;
+static pthread_mutex_t thumb_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t thumb_cond = PTHREAD_COND_INITIALIZER;
+
+// Request state (protected by thumb_mutex)
+static char thumb_request_path[MAX_PATH]; // Path to load (empty = no request)
+static int thumb_request_width; // Max width for scaling
+static int thumb_request_height; // Max height for scaling
+static int thumb_shutdown; // Signal thread to exit
+
+// Result state (protected by thumb_mutex)
+static SDL_Surface* thumb_result; // Loaded surface (NULL if no thumbnail)
+static char thumb_result_path[MAX_PATH]; // Path that was loaded
+
+/**
+ * Background thread function for loading thumbnails.
+ * Waits for requests, loads and scales images, posts results.
+ */
+static void* thumb_loader_thread(void* arg) {
+	(void)arg;
+
+	char path[MAX_PATH];
+	int max_w, max_h;
+
+	while (1) {
+		// Wait for a request
+		pthread_mutex_lock(&thumb_mutex);
+		while (thumb_request_path[0] == '\0' && !thumb_shutdown) {
+			pthread_cond_wait(&thumb_cond, &thumb_mutex);
+		}
+
+		if (thumb_shutdown) {
+			pthread_mutex_unlock(&thumb_mutex);
+			break;
+		}
+
+		// Copy request parameters
+		strcpy(path, thumb_request_path);
+		max_w = thumb_request_width;
+		max_h = thumb_request_height;
+		thumb_request_path[0] = '\0'; // Clear request
+		pthread_mutex_unlock(&thumb_mutex);
+
+		// Load and scale (slow operations, done without lock)
+		SDL_Surface* loaded = NULL;
+		if (exists(path)) {
+			SDL_Surface* orig = IMG_Load(path);
+			if (orig) {
+				loaded = GFX_scaleToFit(orig, max_w, max_h);
+				if (loaded != orig)
+					SDL_FreeSurface(orig);
+			}
+		}
+
+		// Post result
+		pthread_mutex_lock(&thumb_mutex);
+		// Check if request was superseded while we were loading
+		if (thumb_request_path[0] == '\0') {
+			// No new request - post our result
+			if (thumb_result)
+				SDL_FreeSurface(thumb_result);
+			thumb_result = loaded;
+			strcpy(thumb_result_path, path);
+		} else {
+			// Request was superseded - discard our result
+			if (loaded)
+				SDL_FreeSurface(loaded);
+		}
+		pthread_mutex_unlock(&thumb_mutex);
+	}
+
+	return NULL;
+}
+
+/**
+ * Starts the thumbnail loader thread.
+ * Call once at startup.
+ */
+static void ThumbLoader_init(void) {
+	thumb_request_path[0] = '\0';
+	thumb_result_path[0] = '\0';
+	thumb_result = NULL;
+	thumb_shutdown = 0;
+	pthread_create(&thumb_thread, NULL, thumb_loader_thread, NULL);
+}
+
+/**
+ * Stops the thumbnail loader thread and frees resources.
+ * Call once at shutdown.
+ */
+static void ThumbLoader_quit(void) {
+	pthread_mutex_lock(&thumb_mutex);
+	thumb_shutdown = 1;
+	pthread_cond_signal(&thumb_cond);
+	pthread_mutex_unlock(&thumb_mutex);
+
+	pthread_join(thumb_thread, NULL);
+
+	if (thumb_result) {
+		SDL_FreeSurface(thumb_result);
+		thumb_result = NULL;
+	}
+}
+
+/**
+ * Requests a thumbnail to be loaded asynchronously.
+ * Supersedes any pending request. Returns immediately.
+ *
+ * @param path Path to image file
+ * @param max_w Maximum width after scaling
+ * @param max_h Maximum height after scaling
+ */
+static void ThumbLoader_request(const char* path, int max_w, int max_h) {
+	pthread_mutex_lock(&thumb_mutex);
+	strcpy(thumb_request_path, path);
+	thumb_request_width = max_w;
+	thumb_request_height = max_h;
+	pthread_cond_signal(&thumb_cond);
+	pthread_mutex_unlock(&thumb_mutex);
+}
+
+/**
+ * Checks if a thumbnail is ready and retrieves it.
+ * Non-blocking - returns NULL if not ready or path doesn't match.
+ *
+ * @param path Path that was requested
+ * @return Surface if ready and path matches (caller takes ownership), NULL otherwise
+ */
+static SDL_Surface* ThumbLoader_get(const char* path) {
+	SDL_Surface* result = NULL;
+
+	pthread_mutex_lock(&thumb_mutex);
+	if (thumb_result && exactMatch(thumb_result_path, path)) {
+		result = thumb_result;
+		thumb_result = NULL;
+		thumb_result_path[0] = '\0';
+	}
+	pthread_mutex_unlock(&thumb_mutex);
+
+	return result;
+}
 
 ///////////////////////////////
 // File browser entries
@@ -2023,6 +2175,7 @@ int main(int argc, char* argv[]) {
 
 	SDL_Surface* version = NULL;
 
+	ThumbLoader_init();
 	Menu_init();
 	// LOG_info("- menu init: %lu", SDL_GetTicks() - main_begin);
 
@@ -2036,14 +2189,11 @@ int main(int argc, char* argv[]) {
 	int show_setting = 0; // 1=brightness, 2=volume overlay
 	int was_online = PLAT_isOnline();
 
-	// Deferred thumbnail loading state - prevents UI stutter during fast scrolling
-	uint32_t last_scroll_time = 0; // 0 = load immediately (no scroll delay)
-	char pending_thumb_path[MAX_PATH] = {0};
-	int thumb_load_pending = 1; // Start with pending to load initial selection
-
-	// Thumbnail cache - shared across frames to avoid reloading same image
-	char cached_thumb_path[MAX_PATH] = {0};
-	SDL_Surface* cached_thumb = NULL;
+	// Async thumbnail loading state
+	SDL_Surface* cached_thumb = NULL; // Currently displayed thumbnail
+	char cached_thumb_path[MAX_PATH] = {0}; // Path of cached thumbnail
+	Entry* last_rendered_entry = NULL; // Last entry we rendered (for change detection)
+	int thumb_exists = 0; // Whether thumbnail exists for current entry
 
 	// LOG_info("- loop start: %lu", SDL_GetTicks() - main_begin);
 	while (!quit) {
@@ -2173,15 +2323,6 @@ int main(int argc, char* argv[]) {
 			if (selected != top->selected) {
 				top->selected = selected;
 				dirty = 1;
-				last_scroll_time = now; // Track for deferred thumbnail loading
-				thumb_load_pending = 1;
-
-				// Clear cached thumbnail when selection changes to prevent wrong image showing
-				if (cached_thumb) {
-					SDL_FreeSurface(cached_thumb);
-					cached_thumb = NULL;
-					cached_thumb_path[0] = '\0';
-				}
 			}
 
 			// Check if selected ROM has save state for resume
@@ -2197,90 +2338,73 @@ int main(int argc, char* argv[]) {
 				Entry_open(top->entries->items[top->selected]);
 				total = top->entries->count;
 				dirty = 1;
-				thumb_load_pending = 1;
-				last_scroll_time = 0; // Immediate load (no scrolling delay)
-
 				if (total > 0)
 					readyResume(top->entries->items[top->selected]);
 			} else if (PAD_justPressed(BTN_B) && stack->count > 1) {
 				closeDirectory();
 				total = top->entries->count;
 				dirty = 1;
-				thumb_load_pending = 1;
-				last_scroll_time = 0; // Immediate load (no scrolling delay)
 				if (total > 0)
 					readyResume(top->entries->items[top->selected]);
 			}
 		}
 
-		// Deferred thumbnail loading: load after scrolling stops to prevent UI stutter
-		// This runs BEFORE rendering, so if a thumbnail loads it can be shown in this frame
-#define THUMB_SCROLL_DELAY_MS 100
+		// Thumbnail handling - all logic in one place
+		// Detect when selected entry changes and update thumbnail state
+		Entry* current_entry = (total > 0) ? top->entries->items[top->selected] : NULL;
+		if (current_entry != last_rendered_entry) {
+			// Selection changed - check if new entry has a thumbnail
+			if (cached_thumb) {
+				SDL_FreeSurface(cached_thumb);
+				cached_thumb = NULL;
+			}
+			cached_thumb_path[0] = '\0';
+			thumb_exists = 0;
 
-		if (thumb_load_pending && (now - last_scroll_time >= THUMB_SCROLL_DELAY_MS)) {
-			// User paused scrolling - try to load thumbnail for current selection
-			if (!show_version && total > 0) {
-				Entry* entry = top->entries->items[top->selected];
-				char res_root[MAX_PATH];
-				strcpy(res_root, entry->path);
+			if (current_entry && !show_version) {
+				char* last_slash = strrchr(current_entry->path, '/');
+				if (last_slash) {
+					int dir_len = last_slash - current_entry->path;
+					snprintf(cached_thumb_path, MAX_PATH, "%.*s/.res/%s.png", dir_len,
+					         current_entry->path, last_slash + 1);
+					thumb_exists = exists(cached_thumb_path);
 
-				char tmp_path[MAX_PATH];
-				strcpy(tmp_path, entry->path);
-				char* res_name = strrchr(tmp_path, '/') + 1;
-
-				char* tmp = strrchr(res_root, '/');
-				tmp[0] = '\0';
-
-				sprintf(pending_thumb_path, "%s/.res/%s.png", res_root, res_name);
-
-				// Only load if different from cached
-				if (strcmp(pending_thumb_path, cached_thumb_path) != 0) {
-					if (exists(pending_thumb_path)) {
-						// Load and scale new thumbnail
-						SDL_Surface* thumb_orig = IMG_Load(pending_thumb_path);
-
+					// Request async load if thumbnail exists
+					// Max width is 40% of screen (text gets 60%)
+					if (thumb_exists) {
 						int padding = DP(ui.edge_padding);
-						int max_width = (ui.screen_width_px / 2) - padding;
+						int max_width = (ui.screen_width_px * 40) / 100 - padding;
 						int max_height = ui.screen_height_px - (padding * 2);
-						SDL_Surface* thumb = GFX_scaleToFit(thumb_orig, max_width, max_height);
-
-						if (thumb != thumb_orig)
-							SDL_FreeSurface(thumb_orig);
-
-						if (cached_thumb)
-							SDL_FreeSurface(cached_thumb);
-
-						cached_thumb = thumb;
-						strcpy(cached_thumb_path, pending_thumb_path);
-						dirty = 1; // Trigger render to show new thumbnail
-					} else {
-						// No thumbnail for this entry
-						if (cached_thumb) {
-							SDL_FreeSurface(cached_thumb);
-							cached_thumb = NULL;
-							cached_thumb_path[0] = '\0';
-							dirty = 1; // Trigger render without thumbnail
-						}
+						ThumbLoader_request(cached_thumb_path, max_width, max_height);
 					}
 				}
 			}
-			thumb_load_pending = 0;
+			last_rendered_entry = current_entry;
+		}
+
+		// Poll for async thumbnail load completion
+		if (thumb_exists && !cached_thumb && cached_thumb_path[0]) {
+			SDL_Surface* loaded = ThumbLoader_get(cached_thumb_path);
+			if (loaded) {
+				cached_thumb = loaded;
+				dirty = 1;
+			}
 		}
 
 		// Rendering
 		if (dirty) {
 			GFX_clear(screen);
 
-			int ox = 0; // Initialize to avoid uninitialized warning
 			int oy;
 
-			// Thumbnail support: display cached thumbnail if available
-			// Loading is deferred until scrolling stops (see above)
-			int had_thumb = 0;
+			// Fixed thumbnail area width (40% of screen) when thumbnail exists
+			// Text gets 60%, thumbnail gets 40% - prevents text reflowing when thumbnail loads
+			int thumb_area_x = (ui.screen_width_px * 60) / 100;
+
+			// Display cached thumbnail if available (centered in thumbnail area)
 			if (!show_version && total > 0 && cached_thumb) {
-				had_thumb = 1;
 				int padding = DP(ui.edge_padding);
-				ox = ui.screen_width_px - cached_thumb->w - padding;
+				int ox = ui.screen_width_px - cached_thumb->w - padding;
 				oy = (ui.screen_height_px - cached_thumb->h) / 2;
 				SDL_BlitSurface(cached_thumb, NULL, screen, &(SDL_Rect){ox, oy, 0, 0});
 			}
@@ -2384,12 +2508,15 @@ int main(int argc, char* argv[]) {
 						char* entry_name = entry->name;
 						char* entry_unique = entry->unique;
 						// Calculate available width in pixels
-						// ox is in pixels (thumbnail offset), screen width converted from DP to pixels
-						int available_width =
-						    (had_thumb && j != selected_row ? ox : DP(ui.screen_width)) -
-						    DP(ui.edge_padding * 2);
-						if (i == top->start && !(had_thumb && j != selected_row))
-							available_width -= ow; //
+						// Use fixed 60% width when thumbnail exists (prevents text reflow)
+						int available_width;
+						if (thumb_exists) {
+							available_width = thumb_area_x - DP(ui.edge_padding * 2);
+						} else {
+							available_width = DP(ui.screen_width) - DP(ui.edge_padding * 2);
+							if (i == top->start)
+								available_width -= ow;
+						}
 
 						SDL_Color text_color = COLOR_WHITE;
 
@@ -2498,7 +2625,10 @@ int main(int argc, char* argv[]) {
 
 	if (version)
 		SDL_FreeSurface(version);
+	if (cached_thumb)
+		SDL_FreeSurface(cached_thumb);
 
+	ThumbLoader_quit();
 	Menu_quit();
 	PWR_quit();
 	PAD_quit();
