@@ -214,7 +214,7 @@ tests/utils_test: tests/unit/all/common/test_utils.c workspace/all/common/utils.
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
 
 # Build No-Intro name parser tests
-tests/nointro_parser_test: tests/unit/all/common/test_nointro_parser.c workspace/all/common/nointro_parser.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c $(TEST_UNITY)
+tests/nointro_parser_test: tests/unit/all/common/test_nointro_parser.c workspace/all/common/nointro_parser.c workspace/all/common/utils.c workspace/all/common/log.c $(TEST_UNITY)
 	@echo "Building No-Intro name parser tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
 
@@ -224,12 +224,12 @@ tests/pad_test: tests/unit/all/common/test_api_pad.c workspace/all/common/pad.c 
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
 
 # Build collections (Array/Hash) tests
-tests/collections_test: tests/unit/all/common/test_collections.c workspace/all/common/collections.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c $(TEST_UNITY)
+tests/collections_test: tests/unit/all/common/test_collections.c workspace/all/common/collections.c workspace/all/common/utils.c workspace/all/common/log.c $(TEST_UNITY)
 	@echo "Building collections tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L
 
 # Build GFX text utility tests (uses fff for TTF mocking)
-tests/gfx_text_test: tests/unit/all/common/test_gfx_text.c workspace/all/common/gfx_text.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c tests/support/sdl_fakes.c $(TEST_UNITY)
+tests/gfx_text_test: tests/unit/all/common/test_gfx_text.c workspace/all/common/gfx_text.c workspace/all/common/utils.c workspace/all/common/log.c tests/support/sdl_fakes.c $(TEST_UNITY)
 	@echo "Building GFX text utility tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) -I tests/support/fff $(TEST_CFLAGS) -DUNIT_TEST_BUILD
 
@@ -244,42 +244,42 @@ tests/minarch_paths_test: tests/unit/all/common/test_minarch_paths.c workspace/a
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
 
 # Build LessUI launcher utility tests (pure string logic)
-tests/minui_utils_test: tests/unit/all/common/test_minui_utils.c workspace/all/common/minui_utils.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c $(TEST_UNITY)
+tests/minui_utils_test: tests/unit/all/common/test_minui_utils.c workspace/all/common/minui_utils.c workspace/all/common/utils.c workspace/all/common/log.c $(TEST_UNITY)
 	@echo "Building LessUI launcher utility tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS)
 
 # Build M3U parser tests (uses file mocking with GCC --wrap, Docker-only)
-tests/m3u_parser_test: tests/unit/all/common/test_m3u_parser.c workspace/all/common/m3u_parser.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
+tests/m3u_parser_test: tests/unit/all/common/test_m3u_parser.c workspace/all/common/m3u_parser.c workspace/all/common/utils.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
 	@echo "Building M3U parser tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
 # Build LessUI file utility tests (uses file mocking with GCC --wrap, Docker-only)
-tests/minui_file_utils_test: tests/unit/all/common/test_minui_file_utils.c workspace/all/common/minui_file_utils.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
+tests/minui_file_utils_test: tests/unit/all/common/test_minui_file_utils.c workspace/all/common/minui_file_utils.c workspace/all/common/utils.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
 	@echo "Building LessUI file utility tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
 # Build map.txt parser tests (uses file mocking with GCC --wrap, Docker-only)
-tests/map_parser_test: tests/unit/all/common/test_map_parser.c workspace/all/common/map_parser.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
+tests/map_parser_test: tests/unit/all/common/test_map_parser.c workspace/all/common/map_parser.c workspace/all/common/utils.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
 	@echo "Building map.txt parser tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
 # Build collection parser tests (uses file mocking with GCC --wrap, Docker-only)
-tests/collection_parser_test: tests/unit/all/common/test_collection_parser.c workspace/all/common/collection_parser.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
+tests/collection_parser_test: tests/unit/all/common/test_collection_parser.c workspace/all/common/collection_parser.c workspace/all/common/utils.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
 	@echo "Building collection parser tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
 # Build recent.txt file tests (uses file mocking with GCC --wrap, Docker-only)
-tests/recent_parser_test: tests/unit/all/common/test_recent_parser.c workspace/all/common/recent_file.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
+tests/recent_parser_test: tests/unit/all/common/test_recent_parser.c workspace/all/common/recent_file.c workspace/all/common/utils.c workspace/all/common/log.c tests/support/fs_mocks.c $(TEST_UNITY)
 	@echo "Building recent.txt parser tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L -Wl,--wrap=exists -Wl,--wrap=fopen -Wl,--wrap=fclose -Wl,--wrap=fgets
 
 # Build recent.txt writer tests (uses real temp files, no --wrap needed)
-tests/recent_writer_test: tests/unit/all/common/test_recent_writer.c workspace/all/common/recent_file.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c $(TEST_UNITY)
+tests/recent_writer_test: tests/unit/all/common/test_recent_writer.c workspace/all/common/recent_file.c workspace/all/common/utils.c workspace/all/common/log.c $(TEST_UNITY)
 	@echo "Building recent.txt writer tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_POSIX_C_SOURCE=200809L
 
 # Build directory utility tests (uses real temp directories, no --wrap needed)
-tests/directory_utils_test: tests/unit/all/common/test_directory_utils.c workspace/all/common/minui_file_utils.c workspace/all/common/utils.c workspace/all/common/nointro_parser.c workspace/all/common/log.c $(TEST_UNITY)
+tests/directory_utils_test: tests/unit/all/common/test_directory_utils.c workspace/all/common/minui_file_utils.c workspace/all/common/utils.c workspace/all/common/log.c $(TEST_UNITY)
 	@echo "Building directory utility tests..."
 	@$(CC) -o $@ $^ $(TEST_INCLUDES) $(TEST_CFLAGS) -D_DEFAULT_SOURCE
 
@@ -309,7 +309,6 @@ tests/integration_workflows_test: tests/integration/test_workflows.c \
 	workspace/all/common/binary_file_utils.c \
 	workspace/all/common/minarch_paths.c \
 	workspace/all/common/utils.c \
-	workspace/all/common/nointro_parser.c \
 	workspace/all/common/log.c \
 	$(TEST_UNITY)
 	@echo "Building integration tests..."

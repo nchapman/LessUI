@@ -68,6 +68,7 @@ INCDIR = -I. -I$(COMMON_DIR)/ -I$(PLATFORM_DIR)/ $(EXTRA_INCDIR)
 
 COMMON_SOURCE = \
 	$(COMMON_DIR)/utils.c \
+	$(COMMON_DIR)/nointro_parser.c \
 	$(COMMON_DIR)/api.c \
 	$(COMMON_DIR)/log.c \
 	$(COMMON_DIR)/collections.c \

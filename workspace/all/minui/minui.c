@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <msettings.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,12 +43,190 @@
 #include "api.h"
 #include "collections.h"
 #include "defines.h"
+#include "str_compare.h"
 #include "utils.h"
 
 ///////////////////////////////
 // Note: Array and Hash data structures moved to workspace/all/common/collections.c
 // This makes them reusable across all components and easier to test.
 ///////////////////////////////
+
+///////////////////////////////
+// List View Configuration
+//
+// Tunable parameters for the list view rendering.
+// All values are easily adjustable for tweaking the UI layout.
+///////////////////////////////
+
+// Thumbnail layout (percentages of screen width)
+#define THUMB_TEXT_WIDTH_PERCENT 60 // Text area width when thumbnail shown (unselected items)
+#define THUMB_SELECTED_WIDTH_PERCENT 100 // Selected item text width when thumbnail shown
+#define THUMB_MAX_WIDTH_PERCENT 40 // Maximum thumbnail width
+
+// Thumbnail animation
+#define THUMB_FADE_DURATION_MS 100 // Duration of fade-in animation in milliseconds
+#define THUMB_FADE_FRAME_MS 16 // Assumed frame time (60fps = ~16ms)
+#define THUMB_ALPHA_MAX 255 // Fully opaque
+#define THUMB_ALPHA_MIN 0 // Fully transparent
+
+///////////////////////////////
+// Async thumbnail loader
+//
+// Loads thumbnails in a background thread to prevent UI stutter during scrolling.
+// Design: Single worker thread with request superseding (new requests cancel pending).
+// Thread-safe handoff via mutex-protected result surface.
+///////////////////////////////
+
+// Thumbnail loader state
+static pthread_t thumb_thread;
+static int thumb_thread_valid; // Whether thread was successfully created
+static pthread_mutex_t thumb_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t thumb_cond = PTHREAD_COND_INITIALIZER;
+
+// Request state (protected by thumb_mutex)
+static char thumb_request_path[MAX_PATH]; // Path to load (empty = no request)
+static int thumb_request_width; // Max width for scaling
+static int thumb_request_height; // Max height for scaling
+static int thumb_shutdown; // Signal thread to exit
+
+// Result state (protected by thumb_mutex)
+static SDL_Surface* thumb_result; // Loaded surface (NULL if no thumbnail)
+static char thumb_result_path[MAX_PATH]; // Path that was loaded
+
+/**
+ * Background thread function for loading thumbnails.
+ * Waits for requests, loads and scales images, posts results.
+ */
+static void* thumb_loader_thread(void* arg) {
+	(void)arg;
+	LOG_debug("Thumbnail thread started");
+
+	char path[MAX_PATH];
+	int max_w, max_h;
+	while (1) {
+		// Wait for a request
+		pthread_mutex_lock(&thumb_mutex);
+		while (thumb_request_path[0] == '\0' && !thumb_shutdown) {
+			pthread_cond_wait(&thumb_cond, &thumb_mutex);
+		}
+
+		if (thumb_shutdown) {
+			pthread_mutex_unlock(&thumb_mutex);
+			break;
+		}
+
+		// Copy request parameters
+		strcpy(path, thumb_request_path);
+		max_w = thumb_request_width;
+		max_h = thumb_request_height;
+		thumb_request_path[0] = '\0'; // Clear request
+		pthread_mutex_unlock(&thumb_mutex);
+
+		// Load and scale (slow operations, done without lock)
+		// Note: caller already verified file exists before requesting
+		SDL_Surface* loaded = NULL;
+		SDL_Surface* orig = IMG_Load(path);
+		if (orig) {
+			loaded = GFX_scaleToFit(orig, max_w, max_h);
+			if (loaded != orig)
+				SDL_FreeSurface(orig);
+		}
+
+		// Post result
+		pthread_mutex_lock(&thumb_mutex);
+		// Check if request was superseded while we were loading
+		if (thumb_request_path[0] == '\0') {
+			// No new request - post our result
+			if (thumb_result)
+				SDL_FreeSurface(thumb_result);
+			thumb_result = loaded;
+			strcpy(thumb_result_path, path);
+		} else {
+			// Request was superseded - discard our result
+			if (loaded)
+				SDL_FreeSurface(loaded);
+		}
+		pthread_mutex_unlock(&thumb_mutex);
+	}
+
+	return NULL;
+}
+
+/**
+ * Starts the thumbnail loader thread.
+ * Call once at startup.
+ */
+static void ThumbLoader_init(void) {
+	thumb_request_path[0] = '\0';
+	thumb_result_path[0] = '\0';
+	thumb_result = NULL;
+	thumb_shutdown = 0;
+	thumb_thread_valid = 0;
+	int rc = pthread_create(&thumb_thread, NULL, thumb_loader_thread, NULL);
+	if (rc != 0) {
+		LOG_error("Failed to create thumbnail thread: %d", rc);
+	} else {
+		thumb_thread_valid = 1;
+	}
+}
+
+/**
+ * Stops the thumbnail loader thread and frees resources.
+ * Call once at shutdown.
+ */
+static void ThumbLoader_quit(void) {
+	if (thumb_thread_valid) {
+		pthread_mutex_lock(&thumb_mutex);
+		thumb_shutdown = 1;
+		pthread_cond_signal(&thumb_cond);
+		pthread_mutex_unlock(&thumb_mutex);
+
+		pthread_join(thumb_thread, NULL);
+	}
+
+	if (thumb_result) {
+		SDL_FreeSurface(thumb_result);
+		thumb_result = NULL;
+	}
+}
+
+/**
+ * Requests a thumbnail to be loaded asynchronously.
+ * Supersedes any pending request. Returns immediately.
+ *
+ * @param path Path to image file
+ * @param max_w Maximum width after scaling
+ * @param max_h Maximum height after scaling
+ */
+static void ThumbLoader_request(const char* path, int max_w, int max_h) {
+	pthread_mutex_lock(&thumb_mutex);
+	strcpy(thumb_request_path, path);
+	thumb_request_width = max_w;
+	thumb_request_height = max_h;
+	pthread_cond_signal(&thumb_cond);
+	pthread_mutex_unlock(&thumb_mutex);
+}
+
+/**
+ * Checks if a thumbnail is ready and retrieves it.
+ * Non-blocking - returns NULL if not ready or path doesn't match.
+ *
+ * @param path Path that was requested
+ * @return Surface if ready and path matches (caller takes ownership), NULL otherwise
+ */
+static SDL_Surface* ThumbLoader_get(const char* path) {
+	SDL_Surface* result = NULL;
+
+	pthread_mutex_lock(&thumb_mutex);
+	if (thumb_result && exactMatch(thumb_result_path, path)) {
+		result = thumb_result;
+		thumb_result = NULL;
+		thumb_result_path[0] = '\0';
+	}
+	pthread_mutex_unlock(&thumb_mutex);
+
+	return result;
+}
 
 ///////////////////////////////
 // File browser entries
@@ -71,10 +250,45 @@ enum EntryType {
 typedef struct Entry {
 	char* path; // Full path to file/folder
 	char* name; // Cleaned display name (may be aliased via map.txt)
+	char* sort_key; // Sorting key (name with leading article skipped)
 	char* unique; // Disambiguating text when multiple entries have same name
 	int type; // ENTRY_DIR, ENTRY_PAK, or ENTRY_ROM
 	int alpha; // Index into parent Directory's alphas array for L1/R1 navigation
 } Entry;
+
+/**
+ * Sets an entry's display name and computes its sort key.
+ *
+ * The sort key is the name with any leading article ("The ", "A ", "An ")
+ * stripped, ensuring sorting and alphabetical indexing are consistent.
+ *
+ * @param self Entry to update
+ * @param name New display name (will be copied)
+ * @return 1 on success, 0 on allocation failure
+ */
+static int Entry_setName(Entry* self, const char* name) {
+	char* new_name = strdup(name);
+	if (!new_name)
+		return 0;
+
+	// Compute sort key by skipping leading article
+	const char* key_start = skip_article(name);
+	char* new_sort_key = strdup(key_start);
+	if (!new_sort_key) {
+		free(new_name);
+		return 0;
+	}
+
+	// Free old values and assign new ones
+	if (self->name)
+		free(self->name);
+	if (self->sort_key)
+		free(self->sort_key);
+
+	self->name = new_name;
+	self->sort_key = new_sort_key;
+	return 1;
+}
 
 /**
  * Creates a new entry from a path.
@@ -99,8 +313,10 @@ static Entry* Entry_new(char* path, int type) {
 		free(self);
 		return NULL;
 	}
-	self->name = strdup(display_name);
-	if (!self->name) {
+	// Initialize to NULL before Entry_setName
+	self->name = NULL;
+	self->sort_key = NULL;
+	if (!Entry_setName(self, display_name)) {
 		free(self->path);
 		free(self);
 		return NULL;
@@ -119,6 +335,7 @@ static Entry* Entry_new(char* path, int type) {
 static void Entry_free(Entry* self) {
 	free(self->path);
 	free(self->name);
+	free(self->sort_key);
 	if (self->unique)
 		free(self->unique);
 	free(self);
@@ -141,7 +358,11 @@ static int EntryArray_indexOf(Array* self, char* path) {
 }
 
 /**
- * Comparison function for qsort - sorts entries alphabetically by name.
+ * Comparison function for qsort - sorts entries using natural sort.
+ *
+ * Uses sort_key for comparison, which has leading articles stripped.
+ * Natural sort orders numeric sequences by value, not lexicographically.
+ * Example: "Game 2" < "Game 10" (unlike strcmp where "Game 10" < "Game 2")
  *
  * @param a First entry pointer (Entry**)
  * @param b Second entry pointer (Entry**)
@@ -150,7 +371,7 @@ static int EntryArray_indexOf(Array* self, char* path) {
 static int EntryArray_sortEntry(const void* a, const void* b) {
 	Entry* item1 = *(Entry**)a;
 	Entry* item2 = *(Entry**)b;
-	return strcasecmp(item1->name, item2->name);
+	return strnatcasecmp(item1->sort_key, item2->sort_key);
 }
 
 /**
@@ -207,13 +428,14 @@ static IntArray* IntArray_new(void) {
 
 /**
  * Appends an integer to the array.
+ * Silently drops if array is full.
  *
  * @param self Array to modify
  * @param i Value to append
- *
- * @warning Does not check capacity - caller must ensure count < INT_ARRAY_MAX
  */
 static void IntArray_push(IntArray* self, int i) {
+	if (self->count >= INT_ARRAY_MAX)
+		return;
 	self->items[self->count++] = i;
 }
 
@@ -248,16 +470,17 @@ typedef struct Directory {
 } Directory;
 
 /**
- * Gets the alphabetical index for a string.
+ * Gets the alphabetical index for a sort key.
  *
  * Used to group entries by first letter for L1/R1 shoulder button navigation.
+ * Should be called with entry->sort_key (not entry->name) to match sort order.
  *
- * @param str String to index
+ * @param sort_key Sort key string (articles already stripped)
  * @return 0 for non-alphabetic, 1-26 for A-Z (case-insensitive)
  */
-static int getIndexChar(char* str) {
+static int getIndexChar(char* sort_key) {
 	char i = 0;
-	char c = tolower(str[0]);
+	char c = tolower(sort_key[0]);
 	if (c >= 'a' && c <= 'z')
 		i = (c - 'a') + 1;
 	return i;
@@ -352,11 +575,8 @@ static void Directory_index(Directory* self) {
 				char* filename = strrchr(entry->path, '/') + 1;
 				char* alias = Hash_get(map, filename);
 				if (alias) {
-					char* new_name = strdup(alias);
-					if (!new_name)
+					if (!Entry_setName(entry, alias))
 						continue;
-					free(entry->name);
-					entry->name = new_name;
 					resort = 1;
 					// Check if any alias starts with '.' (hidden)
 					if (!filter && hide(entry->name))
@@ -389,22 +609,12 @@ static void Directory_index(Directory* self) {
 	}
 
 	// Detect duplicates and build alphabetical index
+	// Note: aliases were already applied above, no need to re-apply here
 	Entry* prior = NULL;
 	int alpha = -1;
 	int index = 0;
 	for (int i = 0; i < self->entries->count; i++) {
 		Entry* entry = self->entries->items[i];
-		if (map) {
-			char* filename = strrchr(entry->path, '/') + 1;
-			char* alias = Hash_get(map, filename);
-			if (alias) {
-				char* new_name = strdup(alias);
-				if (new_name) {
-					free(entry->name);
-					entry->name = new_name;
-				}
-			}
-		}
 
 		// Detect duplicate display names
 		if (prior != NULL && exactMatch(prior->name, entry->name)) {
@@ -452,8 +662,9 @@ static void Directory_index(Directory* self) {
 		}
 
 		// Build alphabetical index for L1/R1 navigation
+		// Uses sort_key which has articles stripped, matching sort order
 		if (!skip_index) {
-			int a = getIndexChar(entry->name);
+			int a = getIndexChar(entry->sort_key);
 			if (a != alpha) {
 				index = self->alphas->count;
 				IntArray_push(self->alphas, i);
@@ -1106,12 +1317,8 @@ static Array* getRoot(void) {
 				char* filename = strrchr(entry->path, '/') + 1;
 				char* alias = Hash_get(map, filename);
 				if (alias) {
-					char* new_name = strdup(alias);
-					if (new_name) {
-						free(entry->name);
-						entry->name = new_name;
+					if (Entry_setName(entry, alias))
 						resort = 1;
-					}
 				}
 			}
 			if (resort)
@@ -1186,11 +1393,7 @@ static Array* getRecents(void) {
 		if (!entry)
 			continue;
 		if (recent->alias) {
-			char* new_name = strdup(recent->alias);
-			if (new_name) {
-				free(entry->name);
-				entry->name = new_name;
-			}
+			Entry_setName(entry, recent->alias);
 		}
 		Array_push(entries, entry);
 	}
@@ -1268,11 +1471,9 @@ static Array* getDiscs(char* path) {
 				Entry* entry = Entry_new(disc_path, ENTRY_ROM);
 				if (!entry)
 					continue;
-				free(entry->name);
 				char name[16];
 				sprintf(name, "Disc %i", disc);
-				entry->name = strdup(name);
-				if (!entry->name) {
+				if (!Entry_setName(entry, name)) {
 					Entry_free(entry);
 					continue;
 				}
@@ -1984,23 +2185,28 @@ int main(int argc, char* argv[]) {
 	simple_mode = exists(SIMPLE_MODE_PATH);
 
 	LOG_info("Starting MinUI on %s", PLATFORM);
+
+	LOG_debug("InitSettings");
 	InitSettings();
 
+	LOG_debug("GFX_init");
 	SDL_Surface* screen = GFX_init(MODE_MAIN);
-	// LOG_info("- graphics init: %lu", SDL_GetTicks() - main_begin);
 
+	LOG_debug("PAD_init");
 	PAD_init();
-	// LOG_info("- input init: %lu", SDL_GetTicks() - main_begin);
 
+	LOG_debug("PWR_init");
 	PWR_init();
 	if (!HAS_POWER_BUTTON && !simple_mode)
 		PWR_disableSleep();
-	// LOG_info("- power init: %lu", SDL_GetTicks() - main_begin);
 
 	SDL_Surface* version = NULL;
 
+	LOG_debug("ThumbLoader_init");
+	ThumbLoader_init();
+
+	LOG_debug("Menu_init");
 	Menu_init();
-	// LOG_info("- menu init: %lu", SDL_GetTicks() - main_begin);
 
 	// Reduce CPU speed for menu browsing (saves power and heat)
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
@@ -2012,7 +2218,14 @@ int main(int argc, char* argv[]) {
 	int show_setting = 0; // 1=brightness, 2=volume overlay
 	int was_online = PLAT_isOnline();
 
-	// LOG_info("- loop start: %lu", SDL_GetTicks() - main_begin);
+	// Async thumbnail loading state
+	SDL_Surface* cached_thumb = NULL; // Currently displayed thumbnail
+	char cached_thumb_path[MAX_PATH] = {0}; // Path of cached thumbnail
+	Entry* last_rendered_entry = NULL; // Last entry we rendered (for change detection)
+	int thumb_exists = 0; // Whether thumbnail exists for current entry
+	int thumb_alpha = THUMB_ALPHA_MAX; // Current fade alpha, starts full for instant display
+
+	LOG_debug("Entering main loop");
 	while (!quit) {
 		GFX_startFrame();
 		unsigned long now = SDL_GetTicks();
@@ -2155,7 +2368,6 @@ int main(int argc, char* argv[]) {
 				Entry_open(top->entries->items[top->selected]);
 				total = top->entries->count;
 				dirty = 1;
-
 				if (total > 0)
 					readyResume(top->entries->items[top->selected]);
 			} else if (PAD_justPressed(BTN_B) && stack->count > 1) {
@@ -2167,74 +2379,87 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
+		// Thumbnail handling - all logic in one place
+		// Detect when selected entry changes and update thumbnail state
+		Entry* current_entry = (total > 0) ? top->entries->items[top->selected] : NULL;
+		if (current_entry != last_rendered_entry) {
+			// Selection changed - reset thumbnail state
+			if (cached_thumb) {
+				SDL_FreeSurface(cached_thumb);
+				cached_thumb = NULL;
+			}
+			cached_thumb_path[0] = '\0';
+			thumb_exists = 0;
+
+			if (current_entry && current_entry->path && !show_version) {
+				char* last_slash = strrchr(current_entry->path, '/');
+				if (last_slash && last_slash[1] != '\0') {
+					// Build thumbnail path: /dir/.res/filename.png
+					int dir_len = (int)(last_slash - current_entry->path);
+					if (dir_len > 0 && dir_len < MAX_PATH - 32) { // Leave room for /.res/name.png
+						snprintf(cached_thumb_path, MAX_PATH, "%.*s/.res/%s.png", dir_len,
+						         current_entry->path, last_slash + 1);
+						thumb_exists = exists(cached_thumb_path);
+
+						// Request async load if thumbnail exists
+						if (thumb_exists) {
+							int padding = DP(ui.edge_padding);
+							int max_width =
+							    (ui.screen_width_px * THUMB_MAX_WIDTH_PERCENT) / 100 - padding;
+							int max_height = ui.screen_height_px - (padding * 2);
+							if (max_width > 0 && max_height > 0) {
+								ThumbLoader_request(cached_thumb_path, max_width, max_height);
+							}
+						}
+					}
+				}
+			}
+			last_rendered_entry = current_entry;
+		}
+
+		// Check if thumbnail is actually loaded and ready to display
+		int showing_thumb = (!show_version && total > 0 && cached_thumb && cached_thumb->w > 0 &&
+		                     cached_thumb->h > 0);
+
+		// Poll for async thumbnail load completion
+		if (thumb_exists && !cached_thumb && cached_thumb_path[0]) {
+			SDL_Surface* loaded = ThumbLoader_get(cached_thumb_path);
+			if (loaded) {
+				cached_thumb = loaded;
+				thumb_alpha = THUMB_ALPHA_MIN; // Start fade from transparent
+				dirty = 1;
+			}
+		}
+
+		// Animate thumbnail fade-in
+		if (cached_thumb && thumb_alpha < THUMB_ALPHA_MAX) {
+			int fade_step = (THUMB_ALPHA_MAX * THUMB_FADE_FRAME_MS) / THUMB_FADE_DURATION_MS;
+			thumb_alpha += fade_step;
+			if (thumb_alpha > THUMB_ALPHA_MAX)
+				thumb_alpha = THUMB_ALPHA_MAX;
+			dirty = 1;
+		}
+
 		// Rendering
 		if (dirty) {
 			GFX_clear(screen);
 
-			int ox = 0; // Initialize to avoid uninitialized warning
 			int oy;
 
-			// Thumbnail support with caching:
-			// For an entry named "NAME.EXT", check for /.res/NAME.EXT.png
-			// Image is scaled to fit within available space and cached for performance
-			static char cached_thumb_path[MAX_PATH] = {0};
-			static SDL_Surface* cached_thumb = NULL;
 
-			int had_thumb = 0;
-			if (!show_version && total > 0) {
-				Entry* entry = top->entries->items[top->selected];
-				char res_path[MAX_PATH];
-
-				char res_root[MAX_PATH];
-				strcpy(res_root, entry->path);
-
-				char tmp_path[MAX_PATH];
-				strcpy(tmp_path, entry->path);
-				char* res_name = strrchr(tmp_path, '/') + 1;
-
-				char* tmp = strrchr(res_root, '/');
-				tmp[0] = '\0';
-
-				sprintf(res_path, "%s/.res/%s.png", res_root, res_name);
-				LOG_debug("res_path: %s", res_path);
-				if (exists(res_path)) {
-					had_thumb = 1;
-					SDL_Surface* thumb = NULL;
-
-					// Check if we have this thumbnail cached
-					if (cached_thumb && strcmp(res_path, cached_thumb_path) == 0) {
-						// Use cached thumbnail
-						thumb = cached_thumb;
-					} else {
-						// Load and scale new thumbnail
-						SDL_Surface* thumb_orig = IMG_Load(res_path);
-
-						// Scale to fit within available space (50% of width, full height minus padding)
-						int padding = DP(ui.edge_padding);
-						int max_width = (ui.screen_width_px / 2) - padding;
-						int max_height = ui.screen_height_px - (padding * 2);
-						thumb = GFX_scaleToFit(thumb_orig, max_width, max_height);
-
-						// Free original if different from scaled
-						if (thumb != thumb_orig)
-							SDL_FreeSurface(thumb_orig);
-
-						// Free old cached thumbnail if exists
-						if (cached_thumb)
-							SDL_FreeSurface(cached_thumb);
-
-						// Cache the new thumbnail
-						cached_thumb = thumb;
-						strcpy(cached_thumb_path, res_path);
-					}
-
-					// Position on right side with padding, vertically centered
-					int padding = DP(ui.edge_padding);
-					ox = ui.screen_width_px - thumb->w - padding;
-					oy = (ui.screen_height_px - thumb->h) / 2;
-					SDL_BlitSurface(thumb, NULL, screen, &(SDL_Rect){ox, oy, 0, 0});
-				}
+			// Display cached thumbnail if available (right-aligned with padding)
+			if (showing_thumb) {
+				int padding = DP(ui.edge_padding);
+				int ox = ui.screen_width_px - cached_thumb->w - padding;
+				oy = (ui.screen_height_px - cached_thumb->h) / 2;
+				// Clamp alpha to valid range for SDL compatibility
+				int safe_alpha = (thumb_alpha < 0) ? 0 : ((thumb_alpha > 255) ? 255 : thumb_alpha);
+				SDLX_SetAlpha(cached_thumb, SDL_SRCALPHA, safe_alpha);
+				SDL_BlitSurface(cached_thumb, NULL, screen, &(SDL_Rect){ox, oy, 0, 0});
 			}
+
+			// Text area width when thumbnail is showing (unselected items)
+			int text_area_width = (ui.screen_width_px * THUMB_TEXT_WIDTH_PERCENT) / 100;
 
 			int ow = GFX_blitHardwareGroup(screen, show_setting);
 
@@ -2335,12 +2560,23 @@ int main(int argc, char* argv[]) {
 						char* entry_name = entry->name;
 						char* entry_unique = entry->unique;
 						// Calculate available width in pixels
-						// ox is in pixels (thumbnail offset), screen width converted from DP to pixels
-						int available_width =
-						    (had_thumb && j != selected_row ? ox : DP(ui.screen_width)) -
-						    DP(ui.edge_padding * 2);
-						if (i == top->start && !(had_thumb && j != selected_row))
-							available_width -= ow; //
+						// Use fixed widths when thumbnail is showing (prevents text reflow)
+						int available_width;
+						if (showing_thumb) {
+							if (j == selected_row) {
+								// Selected item gets more width
+								available_width =
+								    (ui.screen_width_px * THUMB_SELECTED_WIDTH_PERCENT) / 100 -
+								    DP(ui.edge_padding * 2);
+							} else {
+								// Unselected items constrained to text area
+								available_width = text_area_width - DP(ui.edge_padding * 2);
+							}
+						} else {
+							available_width = DP(ui.screen_width) - DP(ui.edge_padding * 2);
+							if (i == top->start)
+								available_width -= ow;
+						}
 
 						SDL_Color text_color = COLOR_WHITE;
 
@@ -2449,7 +2685,10 @@ int main(int argc, char* argv[]) {
 
 	if (version)
 		SDL_FreeSurface(version);
+	if (cached_thumb)
+		SDL_FreeSurface(cached_thumb);
 
+	ThumbLoader_quit();
 	Menu_quit();
 	PWR_quit();
 	PAD_quit();
