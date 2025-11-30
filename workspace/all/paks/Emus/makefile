@@ -12,33 +12,79 @@
 MINARCH_CORES_VERSION ?= 20251119
 CORES_BASE = https://github.com/nchapman/minarch-cores/releases/download/$(MINARCH_CORES_VERSION)
 
+# All core management happens in cores/ directory
+CORES_DIR = $(CURDIR)/cores
+
 # Setup hook - download cores (runs once)
 # DESTDIR is absolute path to build/SYSTEM/common/bin
 # Cores go in build/.system/cores (3 levels up from SYSTEM, then down to .system)
 setup:
-	@CORES_DIR="$(DESTDIR)/../../../.system/cores"; \
-	mkdir -p "$$CORES_DIR/a7" "$$CORES_DIR/a53"; \
-	if [ -f cores-override/linux-cortex-a7.zip ]; then \
-		echo "Using local a7 cores from cores-override/..."; \
-		unzip -o -j -q cores-override/linux-cortex-a7.zip -d "$$CORES_DIR/a7"; \
+	@BUILD_CORES_DIR="$(DESTDIR)/../../../.system/cores"; \
+	mkdir -p "$$BUILD_CORES_DIR/a7" "$$BUILD_CORES_DIR/a53" "$(CORES_DIR)"; \
+	\
+	if [ -f "$(CORES_DIR)/override/linux-cortex-a7.zip" ]; then \
+		OVERRIDE_VERSION=$$(stat -f "%Sm" -t "%Y%m%d%H%M%S" "$(CORES_DIR)/override/linux-cortex-a7.zip" 2>/dev/null || echo "unknown"); \
+		if [ -f "$(CORES_DIR)/extracted/override/.version-a7" ] && [ "$$(cat $(CORES_DIR)/extracted/override/.version-a7)" = "$$OVERRIDE_VERSION" ]; then \
+			echo "Using cached override a7 cores ($$OVERRIDE_VERSION)..."; \
+			rsync -a "$(CORES_DIR)/extracted/override/a7/" "$$BUILD_CORES_DIR/a7/"; \
+		else \
+			echo "Extracting override a7 cores ($$OVERRIDE_VERSION)..."; \
+			rm -rf "$(CORES_DIR)/extracted/override/a7"; \
+			mkdir -p "$(CORES_DIR)/extracted/override/a7"; \
+			unzip -j -q "$(CORES_DIR)/override/linux-cortex-a7.zip" -d "$(CORES_DIR)/extracted/override/a7"; \
+			echo "$$OVERRIDE_VERSION" > "$(CORES_DIR)/extracted/override/.version-a7"; \
+			rsync -a "$(CORES_DIR)/extracted/override/a7/" "$$BUILD_CORES_DIR/a7/"; \
+		fi; \
 	else \
-		echo "Downloading a7 cores (ARM32) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
-		curl -sL $(CORES_BASE)/linux-cortex-a7.zip -o /tmp/lessui-cores-a7.zip; \
-		unzip -o -j -q /tmp/lessui-cores-a7.zip -d "$$CORES_DIR/a7"; \
-		rm /tmp/lessui-cores-a7.zip; \
+		if [ -f "$(CORES_DIR)/extracted/remote/.version-a7" ] && [ "$$(cat $(CORES_DIR)/extracted/remote/.version-a7)" = "$(MINARCH_CORES_VERSION)" ]; then \
+			echo "Using cached remote a7 cores ($(MINARCH_CORES_VERSION))..."; \
+			rsync -a "$(CORES_DIR)/extracted/remote/a7/" "$$BUILD_CORES_DIR/a7/"; \
+		else \
+			echo "Downloading remote a7 cores (ARM32) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
+			mkdir -p "$(CORES_DIR)/extracted/remote"; \
+			curl -sL $(CORES_BASE)/linux-cortex-a7.zip -o /tmp/lessui-cores-a7.zip; \
+			rm -rf "$(CORES_DIR)/extracted/remote/a7"; \
+			mkdir -p "$(CORES_DIR)/extracted/remote/a7"; \
+			unzip -j -q /tmp/lessui-cores-a7.zip -d "$(CORES_DIR)/extracted/remote/a7"; \
+			rm /tmp/lessui-cores-a7.zip; \
+			echo "$(MINARCH_CORES_VERSION)" > "$(CORES_DIR)/extracted/remote/.version-a7"; \
+			rsync -a "$(CORES_DIR)/extracted/remote/a7/" "$$BUILD_CORES_DIR/a7/"; \
+		fi; \
 	fi; \
-	if [ -f cores-override/linux-cortex-a53.zip ]; then \
-		echo "Using local a53 cores from cores-override/..."; \
-		unzip -o -j -q cores-override/linux-cortex-a53.zip -d "$$CORES_DIR/a53"; \
+	\
+	if [ -f "$(CORES_DIR)/override/linux-cortex-a53.zip" ]; then \
+		OVERRIDE_VERSION=$$(stat -f "%Sm" -t "%Y%m%d%H%M%S" "$(CORES_DIR)/override/linux-cortex-a53.zip" 2>/dev/null || echo "unknown"); \
+		if [ -f "$(CORES_DIR)/extracted/override/.version-a53" ] && [ "$$(cat $(CORES_DIR)/extracted/override/.version-a53)" = "$$OVERRIDE_VERSION" ]; then \
+			echo "Using cached override a53 cores ($$OVERRIDE_VERSION)..."; \
+			rsync -a "$(CORES_DIR)/extracted/override/a53/" "$$BUILD_CORES_DIR/a53/"; \
+		else \
+			echo "Extracting override a53 cores ($$OVERRIDE_VERSION)..."; \
+			rm -rf "$(CORES_DIR)/extracted/override/a53"; \
+			mkdir -p "$(CORES_DIR)/extracted/override/a53"; \
+			unzip -j -q "$(CORES_DIR)/override/linux-cortex-a53.zip" -d "$(CORES_DIR)/extracted/override/a53"; \
+			echo "$$OVERRIDE_VERSION" > "$(CORES_DIR)/extracted/override/.version-a53"; \
+			rsync -a "$(CORES_DIR)/extracted/override/a53/" "$$BUILD_CORES_DIR/a53/"; \
+		fi; \
 	else \
-		echo "Downloading a53 cores (ARM64) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
-		curl -sL $(CORES_BASE)/linux-cortex-a53.zip -o /tmp/lessui-cores-a53.zip; \
-		unzip -o -j -q /tmp/lessui-cores-a53.zip -d "$$CORES_DIR/a53"; \
-		rm /tmp/lessui-cores-a53.zip; \
+		if [ -f "$(CORES_DIR)/extracted/remote/.version-a53" ] && [ "$$(cat $(CORES_DIR)/extracted/remote/.version-a53)" = "$(MINARCH_CORES_VERSION)" ]; then \
+			echo "Using cached remote a53 cores ($(MINARCH_CORES_VERSION))..."; \
+			rsync -a "$(CORES_DIR)/extracted/remote/a53/" "$$BUILD_CORES_DIR/a53/"; \
+		else \
+			echo "Downloading remote a53 cores (ARM64) from minarch-cores $(MINARCH_CORES_VERSION)..."; \
+			mkdir -p "$(CORES_DIR)/extracted/remote"; \
+			curl -sL $(CORES_BASE)/linux-cortex-a53.zip -o /tmp/lessui-cores-a53.zip; \
+			rm -rf "$(CORES_DIR)/extracted/remote/a53"; \
+			mkdir -p "$(CORES_DIR)/extracted/remote/a53"; \
+			unzip -j -q /tmp/lessui-cores-a53.zip -d "$(CORES_DIR)/extracted/remote/a53"; \
+			rm /tmp/lessui-cores-a53.zip; \
+			echo "$(MINARCH_CORES_VERSION)" > "$(CORES_DIR)/extracted/remote/.version-a53"; \
+			rsync -a "$(CORES_DIR)/extracted/remote/a53/" "$$BUILD_CORES_DIR/a53/"; \
+		fi; \
 	fi; \
+	\
 	echo "Cores deployed successfully:"; \
-	echo "  a7:  $$(ls "$$CORES_DIR/a7"/*.so 2>/dev/null | wc -l | tr -d ' ') cores (ARM32)"; \
-	echo "  a53: $$(ls "$$CORES_DIR/a53"/*.so 2>/dev/null | wc -l | tr -d ' ') cores (ARM64)"
+	echo "  a7:  $$(ls "$$BUILD_CORES_DIR/a7"/*.so 2>/dev/null | wc -l | tr -d ' ') cores (ARM32)"; \
+	echo "  a53: $$(ls "$$BUILD_CORES_DIR/a53"/*.so 2>/dev/null | wc -l | tr -d ' ') cores (ARM64)"
 
 # Build hook - not needed (cores are pre-built)
 build:

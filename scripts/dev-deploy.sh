@@ -61,11 +61,16 @@ fi
 
 echo "Deploying to $SD_CARD..."
 
-# Common rsync options:
-#   -a: archive mode (preserves permissions, etc.)
+# Common rsync options for FAT32/exFAT filesystems:
+#   -r: recursive
+#   -t: preserve modification times (critical for rsync efficiency)
 #   -v: verbose
+#   --no-p: don't preserve permissions (FAT doesn't support)
+#   --no-o: don't preserve owner (FAT doesn't support)
+#   --no-g: don't preserve group (FAT doesn't support)
+#   --modify-window=1: allow 1 second timestamp difference (FAT has 2s granularity)
 #   --exclude: skip macOS metadata files
-RSYNC_OPTS="-av --exclude=.DS_Store --exclude=._*"
+RSYNC_OPTS="-rtv --no-p --no-o --no-g --modify-window=1 --exclude=.DS_Store --exclude=._*"
 
 # Sync .system directory
 if [ -n "$PLATFORM_FILTER" ]; then

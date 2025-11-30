@@ -331,8 +331,8 @@ package: tidy
 	cd ./build && find . -type f -name '.DS_Store' -delete
 	mkdir -p ./build/PAYLOAD
 	mv ./build/SYSTEM ./build/PAYLOAD/.system
-	cp -R ./build/.system/cores ./build/PAYLOAD/.system/
-	cp -R ./build/BOOT/.tmp_update ./build/PAYLOAD/
+	rsync -a ./build/.system/cores/ ./build/PAYLOAD/.system/cores/
+	rsync -a ./build/BOOT/.tmp_update/ ./build/PAYLOAD/.tmp_update/
 
 	# Create LessUI.zip for update installer
 	@if command -v 7z >/dev/null 2>&1; then \
